@@ -6,7 +6,7 @@ import { useProductDetail } from '@/features/products/use-product-detail'
 import { useHasMovements, useUpdateProduct, useUpdateVariant } from '@/features/products/use-product-mutations'
 import { useCategories } from '@/features/products/categories-hooks'
 import { variantLabel } from '@/features/products/types'
-import { uploadBusinessScopedImage, getPublicImageUrl } from '@/lib/image-upload'
+import { uploadBusinessScopedImage, getPublicImageUrl, toUploadErrorMessage } from '@/lib/image-upload'
 import { PRODUCT_IMAGE_BUCKET } from '@/lib/storage-buckets'
 import { useActiveBusiness } from '@/features/business/hooks'
 import { toReadableError } from '@/lib/errors'
@@ -99,10 +99,13 @@ export function EditProductPage() {
     if (!business) return
     setImageUploading(true)
     try {
-      const path = await uploadBusinessScopedImage(PRODUCT_IMAGE_BUCKET, business.id, file)
+      const path = await uploadBusinessScopedImage(PRODUCT_IMAGE_BUCKET, business.id, file, {
+        kind: 'product-image',
+        productId: product?.id,
+      })
       setImagePath(path)
     } catch (error) {
-      setServerError(toReadableError(error))
+      setServerError(toUploadErrorMessage(error))
     } finally {
       setImageUploading(false)
     }

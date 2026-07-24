@@ -5,7 +5,7 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { toReadableError } from '@/lib/errors'
-import { getPublicImageUrl, uploadBusinessScopedImage } from '@/lib/image-upload'
+import { getPublicImageUrl, uploadBusinessScopedImage, toUploadErrorMessage } from '@/lib/image-upload'
 import { BUSINESS_LOGO_BUCKET } from '@/lib/storage-buckets'
 import { useActiveBusiness } from '@/features/business/hooks'
 import { businessSettingsSchema, type BusinessSettingsValues } from '@/features/business/schemas'
@@ -59,10 +59,10 @@ export function SettingsBusinessPage() {
     if (!business) return
     setUploading(true)
     try {
-      const path = await uploadBusinessScopedImage(BUSINESS_LOGO_BUCKET, business.id, file)
+      const path = await uploadBusinessScopedImage(BUSINESS_LOGO_BUCKET, business.id, file, { kind: 'logo' })
       setLogoPath(path)
     } catch (error) {
-      toast({ variant: 'destructive', title: 'Could not upload logo', description: toReadableError(error) })
+      toast({ variant: 'destructive', title: 'Could not upload logo', description: toUploadErrorMessage(error) })
     } finally {
       setUploading(false)
     }
