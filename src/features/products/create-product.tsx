@@ -6,7 +6,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { toReadableError } from '@/lib/errors'
-import { uploadBusinessScopedImage, getPublicImageUrl } from '@/lib/image-upload'
+import { uploadBusinessScopedImage, getPublicImageUrl, toUploadErrorMessage } from '@/lib/image-upload'
 import { PRODUCT_IMAGE_BUCKET } from '@/lib/storage-buckets'
 import { useActiveBusiness } from '@/features/business/hooks'
 import { useCategories } from '@/features/products/categories-hooks'
@@ -96,11 +96,12 @@ export function CreateProductPage() {
     if (!business) return
     setImageUploading(true)
     try {
-      const path = await uploadBusinessScopedImage(PRODUCT_IMAGE_BUCKET, business.id, file)
+      // No product id yet — the product doesn't exist until this form submits.
+      const path = await uploadBusinessScopedImage(PRODUCT_IMAGE_BUCKET, business.id, file, { kind: 'product-image' })
       form.setValue('imagePath', path)
       setImagePreview(getPublicImageUrl(PRODUCT_IMAGE_BUCKET, path))
     } catch (error) {
-      setServerError(toReadableError(error))
+      setServerError(toUploadErrorMessage(error))
     } finally {
       setImageUploading(false)
     }

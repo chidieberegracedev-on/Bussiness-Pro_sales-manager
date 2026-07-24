@@ -1,8 +1,9 @@
 import { useEffect, useState } from 'react'
-import { Link, useNavigate } from 'react-router-dom'
-import { Loader2, AlertCircle } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { AuthLayout } from '@/features/auth/auth-layout'
+import { AuthErrorState } from '@/features/auth/auth-error-state'
 
 export function AuthCallbackPage() {
   const navigate = useNavigate()
@@ -11,45 +12,40 @@ export function AuthCallbackPage() {
   useEffect(() => {
     let cancelled = false
 
+    const query = new URLSearchParams(window.location.search)
+    const hash = new URLSearchParams(window.location.hash.replace(/^#/, ''))
+
+    // Supabase reports verification failures as parameters on a successful
+    // redirect, not as a thrown exception. They arrive in the query string
+    // or the fragment depending on the flow, so both must be checked or an
+    // expired/reused link shows an infinite spinner instead of a message.
+    const failure = query.get('error_description') ?? hash.get('error_description')
+    if (failure) {
+      setError(decodeURIComponent(failure.replace(/\+/g, ' ')))
+      return
+    }
+
     async function run() {
-      const hashParams = new URLSearchParams(window.location.hash.replace(/^#/, ''))
-      const queryParams = new URLSearchParams(window.location.search)
+      // getSession() awaits the client's internal initialization promise,
+      // which is where detectSessionInUrl performs the PKCE exchange (it
+      // reads ?code=, exchanges it, stores the session, and deletes the
+      // code verifier). Do NOT also call exchangeCodeForSession here — that
+      // would exchange the same code a second time against a verifier that
+      // detectSessionInUrl already deleted, producing "PKCE code verifier
+      // not found in storage" on an account that in fact confirmed fine.
+      const { data, error: sessionError } = await supabase.auth.getSession()
+      if (cancelled) return
 
-      // Supabase reports an expired/already-used link as a successful redirect
-      // carrying error params, not as a thrown exception.
-      const errorDescription = hashParams.get('error_description') || queryParams.get('error_description')
-      const errorCode = hashParams.get('error') || queryParams.get('error')
-      if (errorDescription || errorCode) {
-        if (!cancelled) {
-          setError(
-            errorDescription
-              ? decodeURIComponent(errorDescription.replace(/\+/g, ' '))
-              : 'This confirmation link may have expired.',
-          )
-        }
+      if (sessionError) {
+        setError(sessionError.message)
         return
       }
-
-      // PKCE flow (current default): ?code=<uuid> must be explicitly exchanged.
-      const code = queryParams.get('code')
-      if (code) {
-        const { error: exchangeError } = await supabase.auth.exchangeCodeForSession(code)
-        if (exchangeError) {
-          if (!cancelled) setError(exchangeError.message)
-          return
-        }
-      }
-
-      // Implicit flow resolves automatically via detectSessionInUrl before this
-      // point; for PKCE the exchange above just completed it. Either way, the
-      // session should now be present.
-      const { data } = await supabase.auth.getSession()
       if (!data.session) {
-        if (!cancelled) setError('We could not confirm your email. The link may have expired.')
+        setError('We could not confirm your email. The link may have expired or already been used.')
         return
       }
 
-      if (!cancelled) navigate(queryParams.get('next') ?? '/', { replace: true })
+      navigate(query.get('next') ?? '/', { replace: true })
     }
 
     run()
@@ -58,19 +54,7 @@ export function AuthCallbackPage() {
     }
   }, [navigate])
 
-  if (error) {
-    return (
-      <AuthLayout title="Couldn't confirm your email">
-        <div className="flex flex-col items-center gap-3 text-center">
-          <AlertCircle className="size-10 text-danger" />
-          <p className="text-sm text-text-secondary">{error}</p>
-          <Link to="/sign-in" className="mt-2 text-sm font-medium text-primary hover:underline">
-            Back to sign in
-          </Link>
-        </div>
-      </AuthLayout>
-    )
-  }
+  if (error) return <AuthErrorState message={error} />
 
   return (
     <AuthLayout title="Confirming your email">

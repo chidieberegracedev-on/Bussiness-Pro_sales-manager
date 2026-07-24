@@ -1,4 +1,5 @@
 import { supabase } from '@/lib/supabase'
+import { toReadableError } from '@/lib/errors'
 
 const MAX_EDGE = 1200
 const TARGET_BYTES = 300 * 1024
@@ -48,23 +49,92 @@ function canvasToBlob(canvas: HTMLCanvasElement, quality: number): Promise<Blob>
   })
 }
 
-/** Uploads under `{businessId}/...` so storage policy can mirror the RLS model. */
+/**
+ * Supabase Storage returns errors in the result object; it does not throw.
+ * Carrying bucket/path/status/supabaseMessage lets a caller show the real
+ * cause in development while still showing a friendly message in production.
+ */
+export class StorageUploadError extends Error {
+  detail: { bucket: string; path: string; status?: number; supabaseMessage: string }
+
+  constructor(
+    message: string,
+    detail: { bucket: string; path: string; status?: number; supabaseMessage: string },
+  ) {
+    super(message)
+    this.detail = detail
+    this.name = 'StorageUploadError'
+  }
+}
+
+/** Low-level upload. Every image upload in the app routes through this — nothing calls supabase.storage directly elsewhere. */
+async function uploadImage({ bucket, path, file }: { bucket: string; path: string; file: Blob }): Promise<string> {
+  if (import.meta.env.DEV) {
+    console.debug('[storage] uploading', { bucket, path, type: file.type, size: file.size })
+  }
+
+  const { data, error } = await supabase.storage.from(bucket).upload(path, file, {
+    cacheControl: '3600',
+    upsert: false,
+    contentType: 'image/webp',
+  })
+
+  if (error) {
+    const detail = {
+      bucket,
+      path,
+      status: (error as { statusCode?: number; status?: number }).statusCode ?? (error as { status?: number }).status,
+      supabaseMessage: error.message,
+    }
+    console.error('[storage] upload failed', detail, error)
+    throw new StorageUploadError('Upload failed', detail)
+  }
+
+  return data.path
+}
+
+export type ImageUploadTarget =
+  | { kind: 'logo' }
+  // productId is unknown while a product is still being created (it doesn't
+  // exist yet); it's known on edit. Both are valid — the policy only
+  // requires the business ID to be the first path segment.
+  | { kind: 'product-image'; productId?: string }
+
+/**
+ * Every storage object path begins with `{business_id}/...` — the storage
+ * policies read the first path segment as the business ID and deny anything
+ * without it (DATA_MODEL.md §13).
+ */
+function buildImagePath(businessId: string, target: ImageUploadTarget): string {
+  const uuid = crypto.randomUUID()
+  if (target.kind === 'logo') {
+    return `${businessId}/logo/${uuid}.webp`
+  }
+  return target.productId
+    ? `${businessId}/products/${target.productId}/${uuid}.webp`
+    : `${businessId}/products/${uuid}.webp`
+}
+
 export async function uploadBusinessScopedImage(
   bucket: string,
   businessId: string,
   file: File,
+  target: ImageUploadTarget,
 ): Promise<string> {
   const compressed = await compressImage(file)
-  const path = `${businessId}/${crypto.randomUUID()}.webp`
-  const { error } = await supabase.storage.from(bucket).upload(path, compressed, {
-    contentType: 'image/webp',
-    upsert: false,
-  })
-  if (error) throw error
-  return path
+  const path = buildImagePath(businessId, target)
+  return uploadImage({ bucket, path, file: compressed })
 }
 
 export function getPublicImageUrl(bucket: string, path: string | null | undefined): string | undefined {
   if (!path) return undefined
   return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl
+}
+
+/** Friendly message in production; the real Supabase error in development, so a real failure is diagnosable without reproducing it against a live project. */
+export function toUploadErrorMessage(error: unknown): string {
+  if (error instanceof StorageUploadError && import.meta.env.DEV) {
+    return `Upload failed: ${error.detail.supabaseMessage}`
+  }
+  return toReadableError(error)
 }
