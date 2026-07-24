@@ -2,6 +2,7 @@ import { supabase } from '@/lib/supabase'
 
 const MAX_EDGE = 1200
 const TARGET_BYTES = 300 * 1024
+const ACCEPTED_INPUT_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'image/heic', 'image/heif']
 
 /**
  * Compresses and resizes an image before upload — max edge 1200px, WebP,
@@ -9,6 +10,13 @@ const TARGET_BYTES = 300 * 1024
  * metered connection must not feel broken.
  */
 export async function compressImage(file: File): Promise<Blob> {
+  // Every upload is re-encoded to WebP via canvas, so a non-image file (a
+  // PDF, say) would otherwise fail deep inside createImageBitmap with an
+  // opaque browser decode error. Reject it up front with a readable message.
+  if (!ACCEPTED_INPUT_TYPES.includes(file.type)) {
+    throw new Error("That file type isn't supported. Use a JPEG, PNG, WebP, or HEIC image.")
+  }
+
   const bitmap = await createImageBitmap(file)
   const scale = Math.min(1, MAX_EDGE / Math.max(bitmap.width, bitmap.height))
   const width = Math.round(bitmap.width * scale)

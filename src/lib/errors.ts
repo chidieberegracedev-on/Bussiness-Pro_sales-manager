@@ -15,6 +15,8 @@ const SIGNAL_MAP: Array<[RegExp, string]> = [
   [/a product must have at least one variant/i, 'Add at least one variant before saving.'],
   [/no default location found/i, "This business doesn't have a default location yet."],
   [/option value\(s\) but the product defines/i, "This item's options don't match the product's configuration."],
+  [/exceeded the maximum allowed size|payload too large/i, 'That file is too large. Try a smaller image.'],
+  [/mime type .* is not supported|file type isn't supported/i, "That file type isn't supported. Use a JPEG, PNG, WebP, or HEIC image."],
 ]
 
 export function toReadableError(error: unknown): string {
