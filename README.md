@@ -15,7 +15,7 @@ Built per `ARCHITECTURE/WEB_IMPLEMENTATION.md`: Vite + React 19 + TypeScript, Ta
 
 3. **Apply the migrations** in `supabase/migrations/`, in order:
    - `0001_foundation_products_inventory.sql` — schema, RLS, RPCs (`create_business`, `create_product`, `record_stock_movement`, `recalculate_inventory_level`), and the `v_variant_stock` view.
-   - `0002_storage_buckets.sql` — `business-logos` and `product-images` storage buckets, with policies mirroring the RLS model (DATA_MODEL.md §13: readable by anyone, writable by owner/manager of the business under `{business_id}/...`).
+   - `0002_storage_buckets.sql` — `business-logos` and `product-images` storage buckets (public, 2MB/5MB limits, `image/webp` only — the client always re-encodes to WebP before upload), with policies mirroring the RLS model (DATA_MODEL.md §13: readable by anyone, writable by owner/manager of the business under `{business_id}/...`). If you've already applied an earlier version of this migration against a live project, `create policy` will fail on re-run since it isn't idempotent — drop the six `*_read`/`*_write`/`*_update`/`*_delete` policies first, or apply the diff by hand.
 
    ```sh
    supabase db push
@@ -29,7 +29,16 @@ Built per `ARCHITECTURE/WEB_IMPLEMENTATION.md`: Vite + React 19 + TypeScript, Ta
    ```
    Fill in `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY` from your Supabase project settings.
 
-5. **Run the dev server**
+5. **Configure auth redirect URLs** — Supabase Dashboard → Authentication → URL Configuration. This cannot be set from code or migrations.
+
+   | Field | Value |
+   |---|---|
+   | Site URL | your production URL, e.g. `https://your-app.vercel.app` |
+   | Redirect URLs (allow list) | `https://your-app.vercel.app/**`, `https://your-app-*.vercel.app/**` (Vercel preview deployments), `http://localhost:5173/**` (local dev) |
+
+   Wildcards are only honored in the allow list, never in Site URL. If Site URL is left pointing at `localhost`, email confirmation links will resolve to a dev server that isn't running on the recipient's machine and the browser will show a connection error — the confirmation itself will have already succeeded server-side (`auth.users.email_confirmed_at` gets set), only the redirect fails.
+
+6. **Run the dev server**
    ```sh
    npm run dev
    ```
@@ -50,6 +59,8 @@ src/
   types/          database.ts (hand-authored from the migration — see note below)
 supabase/
   migrations/     0001 schema+RLS+RPCs, 0002 storage buckets
+vercel.json       SPA rewrite — every path serves index.html so client-side
+                  routes like /auth/callback resolve on a hard refresh/deep link
 ```
 
 ## Notes on implementation choices
@@ -59,6 +70,7 @@ supabase/
 - **Product list pagination is client-side** over a capped fetch (5,000 rows) from `v_variant_stock`, grouped by product in JS — the approach `WEB_IMPLEMENTATION.md §8.1` explicitly allows for V1 scale ("aggregate server-side if the list exceeds a few thousand variants").
 - **Money and quantities are handled as strings end-to-end** via `decimal.js`, never as JS `number`, until the final display conversion (BR-7.1).
 - Money/date formatting always separates **business currency + timezone** (what's being displayed) from **user locale** (how it's displayed) per DATA_MODEL.md §4–5.
+- **Password reset is not implemented.** It isn't in `WEB_IMPLEMENTATION.md`'s routes table, so no `/forgot-password` UI exists. `resetPasswordForEmail()` would need the same `emailRedirectTo`/callback treatment as sign-up if this is added later.
 
 ## What to verify manually before sign-off
 
