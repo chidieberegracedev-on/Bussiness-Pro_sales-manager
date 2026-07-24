@@ -7,12 +7,11 @@ import { Quantity } from '@/components/quantity/quantity'
 import { StockStatusBadge } from '@/components/data/stock-status-badge'
 import { ProductActionsMenu } from '@/features/products/product-actions-menu'
 import { variantLabel, type GroupedProduct } from '@/features/products/types'
-import { getPublicImageUrl } from '@/lib/image-upload'
 import { PRODUCT_IMAGE_BUCKET } from '@/lib/storage-buckets'
+import { useSignedImageUrls } from '@/hooks/use-signed-image-url'
 import { cn } from '@/lib/utils'
 
-function ProductThumb({ path }: { path: string | null }) {
-  const url = getPublicImageUrl(PRODUCT_IMAGE_BUCKET, path)
+function ProductThumb({ url }: { url: string | undefined }) {
   return (
     <div className="flex size-10 shrink-0 items-center justify-center overflow-hidden rounded-md bg-surface-muted">
       {url ? <img src={url} alt="" className="size-full object-cover" /> : <Package className="size-4 text-text-muted" />}
@@ -32,6 +31,10 @@ function PriceRange({ min, max }: { min: string; max: string }) {
 export function ProductTable({ products }: { products: GroupedProduct[] }) {
   const navigate = useNavigate()
   const [expanded, setExpanded] = useState<Set<string>>(new Set())
+  const { data: imageUrls } = useSignedImageUrls(
+    PRODUCT_IMAGE_BUCKET,
+    products.map((p) => p.imagePath),
+  )
 
   function toggle(id: string) {
     setExpanded((prev) => {
@@ -83,7 +86,7 @@ export function ProductTable({ products }: { products: GroupedProduct[] }) {
                 </TableCell>
                 <TableCell>
                   <div className="flex items-center gap-3">
-                    <ProductThumb path={product.imagePath} />
+                    <ProductThumb url={product.imagePath ? imageUrls?.get(product.imagePath) : undefined} />
                     <div className="min-w-0">
                       <p className="truncate font-medium text-text-primary">{product.productName}</p>
                       {product.hasVariants && (

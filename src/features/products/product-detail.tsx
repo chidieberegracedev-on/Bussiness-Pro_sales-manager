@@ -6,8 +6,8 @@ import { useStockDialogStore } from '@/features/inventory/stock-dialog-store'
 import { variantLabel } from '@/features/products/types'
 import { useActiveBusiness } from '@/features/business/hooks'
 import { useCategories } from '@/features/products/categories-hooks'
-import { getPublicImageUrl } from '@/lib/image-upload'
 import { PRODUCT_IMAGE_BUCKET } from '@/lib/storage-buckets'
+import { useSignedImageUrl } from '@/hooks/use-signed-image-url'
 import { toReadableError } from '@/lib/errors'
 import { Button } from '@/components/ui/button'
 import { Switch } from '@/components/ui/switch'
@@ -34,6 +34,7 @@ export function ProductDetailPage() {
 
   const variantIds = variants?.map((v) => v.variant_id)
   const { data: recentMovements } = useRecentMovements(variantIds)
+  const { data: imageUrl } = useSignedImageUrl(PRODUCT_IMAGE_BUCKET, product?.image_path)
 
   const canManage = role === 'owner' || role === 'manager'
 
@@ -41,7 +42,6 @@ export function ProductDetailPage() {
   if (isError || !product) return <ErrorState error={new Error('load')} onRetry={() => refetch()} />
 
   const categoryName = categories?.find((c) => c.id === product.category_id)?.name
-  const imageUrl = getPublicImageUrl(PRODUCT_IMAGE_BUCKET, product.image_path)
   const isSimple = !product.has_variants
 
   function openStockDialog(kind: 'add' | 'adjust') {
