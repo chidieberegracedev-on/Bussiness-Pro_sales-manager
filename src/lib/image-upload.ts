@@ -126,9 +126,45 @@ export async function uploadBusinessScopedImage(
   return uploadImage({ bucket, path, file: compressed })
 }
 
-export function getPublicImageUrl(bucket: string, path: string | null | undefined): string | undefined {
-  if (!path) return undefined
-  return supabase.storage.from(bucket).getPublicUrl(path).data.publicUrl
+// Buckets are private (public: false) — the storage RLS policies gate reads
+// by business membership, so a URL must be signed rather than public. A
+// signed URL expires; SIGNED_URL_TTL_SECONDS controls how long, and the
+// hooks in hooks/use-signed-image-url.ts set their cache staleTime below
+// this so a stale, expired URL is never served from cache.
+export const SIGNED_URL_TTL_SECONDS = 3600
+
+export async function createSignedImageUrl(
+  bucket: string,
+  path: string,
+  expiresIn = SIGNED_URL_TTL_SECONDS,
+): Promise<string | undefined> {
+  const { data, error } = await supabase.storage.from(bucket).createSignedUrl(path, expiresIn)
+  if (error) {
+    console.error('[storage] failed to sign url', { bucket, path }, error)
+    return undefined
+  }
+  return data.signedUrl
+}
+
+/** One request for every path on a page instead of signing sequentially. */
+export async function createSignedImageUrls(
+  bucket: string,
+  paths: string[],
+  expiresIn = SIGNED_URL_TTL_SECONDS,
+): Promise<Map<string, string>> {
+  if (paths.length === 0) return new Map()
+
+  const { data, error } = await supabase.storage.from(bucket).createSignedUrls(paths, expiresIn)
+  if (error) {
+    console.error('[storage] failed to sign urls', { bucket, count: paths.length }, error)
+    return new Map()
+  }
+
+  const map = new Map<string, string>()
+  for (const item of data) {
+    if (item.signedUrl && item.path) map.set(item.path, item.signedUrl)
+  }
+  return map
 }
 
 /** Friendly message in production; the real Supabase error in development, so a real failure is diagnosable without reproducing it against a live project. */

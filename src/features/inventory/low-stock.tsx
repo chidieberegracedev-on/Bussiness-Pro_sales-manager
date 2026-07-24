@@ -12,8 +12,8 @@ import { StockStatusBadge } from '@/components/data/stock-status-badge'
 import { Card } from '@/components/ui/card'
 import { Button } from '@/components/ui/button'
 import { Quantity } from '@/components/quantity/quantity'
-import { getPublicImageUrl } from '@/lib/image-upload'
 import { PRODUCT_IMAGE_BUCKET } from '@/lib/storage-buckets'
+import { useSignedImageUrls } from '@/hooks/use-signed-image-url'
 import type { StockStatus } from '@/types/database'
 import type { VariantStockRow } from '@/features/products/types'
 
@@ -29,6 +29,10 @@ export function LowStockPage() {
   const { data: rows, isLoading, isError, refetch } = useLowStock()
   const openAddStock = useStockDialogStore((s) => s.openAddStock)
   const canManage = role === 'owner' || role === 'manager'
+  const { data: imageUrls } = useSignedImageUrls(
+    PRODUCT_IMAGE_BUCKET,
+    rows?.map((r) => r.image_path) ?? [],
+  )
 
   const sections = useMemo(() => {
     const grouped: Record<string, VariantStockRow[]> = { negative: [], out_of_stock: [], low: [] }
@@ -72,7 +76,7 @@ export function LowStockPage() {
                 <h2 className="mb-2 text-sm font-semibold text-text-secondary">{SECTION_LABELS[status]} ({sections[status].length})</h2>
                 <div className="divide-y divide-border rounded-md border border-border">
                   {sections[status].map((row) => {
-                    const imageUrl = getPublicImageUrl(PRODUCT_IMAGE_BUCKET, row.image_path)
+                    const imageUrl = row.image_path ? imageUrls?.get(row.image_path) : undefined
                     return (
                       <div
                         key={row.variant_id}

@@ -6,17 +6,21 @@ import { Quantity } from '@/components/quantity/quantity'
 import { StockStatusBadge } from '@/components/data/stock-status-badge'
 import { ProductActionsMenu } from '@/features/products/product-actions-menu'
 import type { GroupedProduct } from '@/features/products/types'
-import { getPublicImageUrl } from '@/lib/image-upload'
 import { PRODUCT_IMAGE_BUCKET } from '@/lib/storage-buckets'
+import { useSignedImageUrls } from '@/hooks/use-signed-image-url'
 import { cn } from '@/lib/utils'
 
 export function ProductCardGrid({ products }: { products: GroupedProduct[] }) {
   const navigate = useNavigate()
+  const { data: imageUrls } = useSignedImageUrls(
+    PRODUCT_IMAGE_BUCKET,
+    products.map((p) => p.imagePath),
+  )
 
   return (
     <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-4">
       {products.map((product) => {
-        const url = getPublicImageUrl(PRODUCT_IMAGE_BUCKET, product.imagePath)
+        const url = product.imagePath ? imageUrls?.get(product.imagePath) : undefined
         return (
           <Card
             key={product.productId}

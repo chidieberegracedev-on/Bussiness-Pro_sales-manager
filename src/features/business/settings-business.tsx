@@ -5,8 +5,9 @@ import { useMutation, useQueryClient } from '@tanstack/react-query'
 import { Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { toReadableError } from '@/lib/errors'
-import { getPublicImageUrl, uploadBusinessScopedImage, toUploadErrorMessage } from '@/lib/image-upload'
+import { uploadBusinessScopedImage, toUploadErrorMessage } from '@/lib/image-upload'
 import { BUSINESS_LOGO_BUCKET } from '@/lib/storage-buckets'
+import { useSignedImageUrl } from '@/hooks/use-signed-image-url'
 import { useActiveBusiness } from '@/features/business/hooks'
 import { businessSettingsSchema, type BusinessSettingsValues } from '@/features/business/schemas'
 import { TimezoneSelect } from '@/features/business/timezone-select'
@@ -23,6 +24,7 @@ export function SettingsBusinessPage() {
   const queryClient = useQueryClient()
   const [uploading, setUploading] = useState(false)
   const [logoPath, setLogoPath] = useState<string | null | undefined>(business?.logo_path)
+  const { data: logoPreviewUrl } = useSignedImageUrl(BUSINESS_LOGO_BUCKET, logoPath)
 
   const form = useForm<BusinessSettingsValues>({
     resolver: zodResolver(businessSettingsSchema),
@@ -91,7 +93,7 @@ export function SettingsBusinessPage() {
               <FormLabel>Logo</FormLabel>
               <div className="mt-2">
                 <ImageUpload
-                  previewUrl={getPublicImageUrl(BUSINESS_LOGO_BUCKET, logoPath)}
+                  previewUrl={logoPreviewUrl}
                   onSelect={handleLogoSelect}
                   onRemove={() => setLogoPath(null)}
                   uploading={uploading}

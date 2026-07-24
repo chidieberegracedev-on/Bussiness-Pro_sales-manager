@@ -6,7 +6,8 @@ import { useProductDetail } from '@/features/products/use-product-detail'
 import { useHasMovements, useUpdateProduct, useUpdateVariant } from '@/features/products/use-product-mutations'
 import { useCategories } from '@/features/products/categories-hooks'
 import { variantLabel } from '@/features/products/types'
-import { uploadBusinessScopedImage, getPublicImageUrl, toUploadErrorMessage } from '@/lib/image-upload'
+import { uploadBusinessScopedImage, toUploadErrorMessage } from '@/lib/image-upload'
+import { useSignedImageUrl } from '@/hooks/use-signed-image-url'
 import { PRODUCT_IMAGE_BUCKET } from '@/lib/storage-buckets'
 import { useActiveBusiness } from '@/features/business/hooks'
 import { toReadableError } from '@/lib/errors'
@@ -54,6 +55,7 @@ export function EditProductPage() {
   const [imageUploading, setImageUploading] = useState(false)
   const [serverError, setServerError] = useState<string | null>(null)
   const online = useOnlineStatus()
+  const { data: imagePreviewUrl } = useSignedImageUrl(PRODUCT_IMAGE_BUCKET, imagePath)
 
   const form = useForm<EditFormValues>({
     defaultValues: {
@@ -158,7 +160,7 @@ export function EditProductPage() {
           <CardContent className="space-y-4">
             <div className="flex gap-4">
               <ImageUpload
-                previewUrl={getPublicImageUrl(PRODUCT_IMAGE_BUCKET, imagePath)}
+                previewUrl={imagePreviewUrl}
                 onSelect={handleImageSelect}
                 onRemove={() => setImagePath(null)}
                 uploading={imageUploading}
