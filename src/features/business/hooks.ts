@@ -69,3 +69,26 @@ export function useActiveBusiness() {
     isError,
   }
 }
+
+/**
+ * V1 has exactly one location per business (DATA_MODEL.md §9) — this is the
+ * one every stock movement and sale is written against.
+ */
+export function useDefaultLocation() {
+  const { business } = useActiveBusiness()
+
+  return useQuery({
+    queryKey: ['default-location', business?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('locations')
+        .select('id, name')
+        .eq('business_id', business!.id)
+        .eq('is_default', true)
+        .single()
+      if (error) throw error
+      return data
+    },
+    enabled: !!business,
+  })
+}

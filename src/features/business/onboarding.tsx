@@ -8,6 +8,7 @@ import { supabase } from '@/lib/supabase'
 import { toReadableError } from '@/lib/errors'
 import { COUNTRIES, getCountry } from '@/lib/countries'
 import { useBusinessStore } from '@/features/business/store'
+import { useCartStore } from '@/features/pos/cart-store'
 import { createBusinessSchema, type CreateBusinessValues } from '@/features/business/schemas'
 import { TimezoneSelect } from '@/features/business/timezone-select'
 import { Button } from '@/components/ui/button'
@@ -49,7 +50,15 @@ export function OnboardingPage() {
       return
     }
 
-    await queryClient.invalidateQueries({ queryKey: ['memberships'] })
+    // Not invalidateQueries: the memberships query has no active observer on
+    // this route (RequireBusiness is a sibling of /onboarding, not mounted
+    // here), so invalidate's default refetchType: 'active' would skip it —
+    // the stale cached empty list would still be there when RequireBusiness
+    // mounts after navigate(), bouncing straight back to /onboarding. clear()
+    // forces a genuine refetch instead, matching select-business.tsx and
+    // business-switcher.tsx.
+    queryClient.clear()
+    useCartStore.getState().reset()
     setActiveBusiness(data.id)
     navigate('/products', { replace: true })
   }

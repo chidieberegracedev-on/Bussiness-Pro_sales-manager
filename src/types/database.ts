@@ -18,6 +18,8 @@ export type StockMovementType =
   | 'transfer_in'
   | 'transfer_out'
 export type StockStatus = 'negative' | 'out_of_stock' | 'low' | 'ok'
+export type SaleStatus = 'completed' | 'voided'
+export type PaymentMethod = 'cash' | 'card' | 'transfer' | 'other'
 
 export interface Database {
   public: {
@@ -222,6 +224,106 @@ export interface Database {
           },
         ]
       }
+      sales: {
+        Row: {
+          id: string
+          business_id: string
+          location_id: string
+          sale_number: string
+          status: SaleStatus
+          subtotal: string
+          discount_total: string
+          tax_total: string
+          grand_total: string
+          cost_total: string
+          currency_code: string
+          sold_by: string | null
+          note: string | null
+          voided_at: string | null
+          voided_by: string | null
+          void_reason: string | null
+          completed_at: string
+          created_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['sales']['Row']> & {
+          id: string
+          business_id: string
+          location_id: string
+        }
+        Update: never
+        Relationships: [
+          {
+            foreignKeyName: 'sales_sold_by_fkey'
+            columns: ['sold_by']
+            isOneToOne: false
+            referencedRelation: 'profiles'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      sale_items: {
+        Row: {
+          id: string
+          sale_id: string
+          business_id: string
+          variant_id: string | null
+          product_name: string
+          variant_name: string | null
+          sku: string | null
+          quantity: string
+          unit_price: string
+          unit_cost: string
+          line_total: string
+          line_cost: string
+          created_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['sale_items']['Row']> & {
+          sale_id: string
+          business_id: string
+          product_name: string
+          quantity: string
+          unit_price: string
+          unit_cost: string
+          line_total: string
+          line_cost: string
+        }
+        Update: never
+        Relationships: [
+          {
+            foreignKeyName: 'sale_items_sale_id_fkey'
+            columns: ['sale_id']
+            isOneToOne: false
+            referencedRelation: 'sales'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      sale_payments: {
+        Row: {
+          id: string
+          sale_id: string
+          business_id: string
+          method: string
+          amount: string
+          created_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['sale_payments']['Row']> & {
+          sale_id: string
+          business_id: string
+          method: string
+          amount: string
+        }
+        Update: never
+        Relationships: [
+          {
+            foreignKeyName: 'sale_payments_sale_id_fkey'
+            columns: ['sale_id']
+            isOneToOne: false
+            referencedRelation: 'sales'
+            referencedColumns: ['id']
+          },
+        ]
+      }
     }
     Views: {
       v_variant_stock: {
@@ -247,6 +349,27 @@ export interface Database {
           avg_cost: string
           stock_value: string
           stock_status: StockStatus
+        }
+        Relationships: []
+      }
+      v_sale_summary: {
+        Row: {
+          id: string
+          business_id: string
+          location_id: string
+          sale_number: string
+          status: SaleStatus
+          subtotal: string
+          grand_total: string
+          cost_total: string
+          gross_profit: string
+          currency_code: string
+          sold_by: string | null
+          sold_by_name: string | null
+          completed_at: string
+          voided_at: string | null
+          item_count: string
+          unit_count: string
         }
         Relationships: []
       }
@@ -298,6 +421,21 @@ export interface Database {
       recalculate_inventory_level: {
         Args: { p_variant_id: string; p_location_id: string }
         Returns: Database['public']['Tables']['inventory_levels']['Row']
+      }
+      complete_sale: {
+        Args: {
+          p_sale_id: string
+          p_business_id: string
+          p_location_id: string
+          p_items: unknown
+          p_payments?: unknown
+          p_note?: string | null
+        }
+        Returns: Database['public']['Tables']['sales']['Row']
+      }
+      void_sale: {
+        Args: { p_sale_id: string; p_reason?: string | null }
+        Returns: Database['public']['Tables']['sales']['Row']
       }
     }
   }

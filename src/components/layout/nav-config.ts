@@ -1,5 +1,5 @@
 import type { LucideIcon } from 'lucide-react'
-import { Package, AlertTriangle, History, Settings } from 'lucide-react'
+import { Package, AlertTriangle, History, Settings, ShoppingCart, Receipt } from 'lucide-react'
 import type { MemberRole } from '@/types/database'
 
 export interface NavItem {
@@ -12,6 +12,8 @@ export interface NavItem {
 
 // Do not add placeholder entries for unbuilt sections (WEB_IMPLEMENTATION.md §7).
 export const NAV_ITEMS: NavItem[] = [
+  { label: 'POS', to: '/pos', icon: ShoppingCart },
+  { label: 'Sales', to: '/sales', icon: Receipt },
   { label: 'Products', to: '/products', icon: Package },
   {
     label: 'Inventory',

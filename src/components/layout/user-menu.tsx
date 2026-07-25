@@ -5,6 +5,7 @@ import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/features/auth/store'
 import { useProfile } from '@/features/auth/use-profile'
 import { useBusinessStore } from '@/features/business/store'
+import { useCartStore } from '@/features/pos/cart-store'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -40,6 +41,7 @@ export function UserMenu() {
       return
     }
     useBusinessStore.getState().clearActiveBusiness()
+    useCartStore.getState().reset()
     queryClient.clear()
     navigate('/sign-in', { replace: true })
   }

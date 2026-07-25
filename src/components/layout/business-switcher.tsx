@@ -3,6 +3,7 @@ import { ChevronsUpDown, Check, Building2 } from 'lucide-react'
 import { useQueryClient } from '@tanstack/react-query'
 import { useActiveBusiness } from '@/features/business/hooks'
 import { useBusinessStore } from '@/features/business/store'
+import { useCartStore } from '@/features/pos/cart-store'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import {
@@ -27,6 +28,7 @@ export function BusinessSwitcher() {
     if (businessId === business?.id) return
     // AC-1.6: switching business fully clears the previous business's cached data.
     queryClient.clear()
+    useCartStore.getState().reset()
     setActiveBusiness(businessId)
     navigate('/products')
   }

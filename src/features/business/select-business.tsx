@@ -3,6 +3,7 @@ import { useQueryClient } from '@tanstack/react-query'
 import { Building2, Store } from 'lucide-react'
 import { useMyMemberships } from '@/features/business/hooks'
 import { useBusinessStore } from '@/features/business/store'
+import { useCartStore } from '@/features/pos/cart-store'
 import { TableSkeleton } from '@/components/data/loading-state'
 import { ErrorState } from '@/components/data/error-state'
 import { Card } from '@/components/ui/card'
@@ -15,6 +16,7 @@ export function SelectBusinessPage() {
 
   function handleSelect(businessId: string) {
     queryClient.clear()
+    useCartStore.getState().reset()
     setActiveBusiness(businessId)
     navigate('/products', { replace: true })
   }

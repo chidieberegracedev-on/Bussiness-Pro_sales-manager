@@ -17,6 +17,9 @@ import { ProductDetailPage } from '@/features/products/product-detail'
 import { EditProductPage } from '@/features/products/edit-product'
 import { LowStockPage } from '@/features/inventory/low-stock'
 import { MovementHistoryPage } from '@/features/inventory/movement-history'
+import { PosPage } from '@/features/pos/pos-page'
+import { SalesListPage } from '@/features/sales/sales-list'
+import { SaleDetailPage } from '@/features/sales/sale-detail'
 import { NotFoundPage } from '@/features/misc/not-found'
 
 const MANAGE_ROLES = ['owner', 'manager'] as const
@@ -38,6 +41,10 @@ export function AppRouter() {
         <Route element={<RequireBusiness />}>
           <Route element={<AppShell />}>
             <Route index element={<Navigate to="/products" replace />} />
+
+            <Route path="/pos" element={<PosPage />} />
+            <Route path="/sales" element={<SalesListPage />} />
+            <Route path="/sales/:id" element={<SaleDetailPage />} />
 
             <Route path="/products" element={<ProductListPage />} />
             <Route path="/products/:id" element={<ProductDetailPage />} />
