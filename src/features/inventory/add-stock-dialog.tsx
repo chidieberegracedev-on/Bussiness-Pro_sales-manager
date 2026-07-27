@@ -70,12 +70,19 @@ function AddStockForm({ context, onDone }: { context: StockDialogContext; onDone
 
     const qtyBefore = new Decimal(selectedVariant.qtyOnHand)
     const avgBefore = new Decimal(selectedVariant.avgCost)
-    const cost = unitCost !== '' ? new Decimal(unitCost) : avgBefore
+    // Cost entered per PURCHASE unit (Cost / Carton) must divide by conversion
+    // before it reaches the ledger — the ledger's unit_cost is per BASE unit
+    // (FIX 007 §Issue 1). 14,900/carton ÷ 44 = 338.6364/piece.
+    const rawCost = unitCost !== '' ? new Decimal(unitCost) : avgBefore
+    const cost =
+      unitMode === 'purchase' && purchaseConversionQty && new Decimal(purchaseConversionQty).gt(0)
+        ? rawCost.div(purchaseConversionQty)
+        : rawCost
     const qtyAfter = qtyBefore.plus(baseQty)
     // BR-5.3 / BR-5.5: inbound onto a zero-or-negative balance resets the average to the incoming cost.
     const avgAfter = qtyBefore.lte(0) ? cost : qtyBefore.times(avgBefore).plus(baseQty.times(cost)).div(qtyAfter)
 
-    return { baseQty, qtyBefore, qtyAfter, avgBefore, avgAfter, cost }
+    return { baseQty, qtyBefore, qtyAfter, avgBefore, avgAfter, cost, rawCost }
   }, [selectedVariant, quantity, unitMode, purchaseConversionQty, unitCost])
 
   async function onSubmit(values: FormValues) {
@@ -88,7 +95,9 @@ function AddStockForm({ context, onDone }: { context: StockDialogContext; onDone
       p_location_id: context.locationId,
       p_movement_type: 'restock',
       p_quantity: preview.baseQty.toNumber(),
-      p_unit_cost: Number(values.unitCost),
+      // preview.cost is already per BASE unit — divided by conversion in
+      // 'purchase' mode. record_stock_movement.p_unit_cost is per base unit.
+      p_unit_cost: preview.cost.toNumber(),
       p_purchase_unit_qty: values.unitMode === 'purchase' ? Number(values.quantity) : null,
       p_purchase_unit: values.unitMode === 'purchase' ? purchaseUnit : null,
       p_reference_type: 'restock',
@@ -141,7 +150,9 @@ function AddStockForm({ context, onDone }: { context: StockDialogContext; onDone
           )}
         </div>
         <div>
-          <label className="text-sm font-medium text-text-primary">Unit cost</label>
+          <label className="text-sm font-medium text-text-primary">
+            Cost per {unitMode === 'purchase' && purchaseUnit ? purchaseUnit : context.baseUnit}
+          </label>
           <MoneyInput className="mt-1.5" {...form.register('unitCost')} placeholder="0.00" />
           {form.formState.errors.unitCost && (
             <p className="mt-1 text-sm font-medium text-danger">{form.formState.errors.unitCost.message}</p>
@@ -163,8 +174,15 @@ function AddStockForm({ context, onDone }: { context: StockDialogContext; onDone
       {preview && (
         <div className="rounded-md border border-border bg-surface-muted/50 p-3 text-sm">
           <p className="font-medium text-text-primary">
-            Adding <Quantity value={preview.baseQty} unit={context.baseUnit} /> at <Money value={preview.cost} /> each
+            Adding <Quantity value={preview.baseQty} unit={context.baseUnit} /> at{' '}
+            <Money value={preview.cost} />/{context.baseUnit} each
           </p>
+          {unitMode === 'purchase' && purchaseConversionQty && !preview.cost.eq(preview.rawCost) && (
+            <p className="mt-0.5 text-xs text-text-muted">
+              <Money value={preview.rawCost} />/{purchaseUnit} ÷ {purchaseConversionQty} ={' '}
+              <Money value={preview.cost} />/{context.baseUnit}
+            </p>
+          )}
           <p className="mt-1 text-text-secondary">
             Stock: <Quantity value={preview.qtyBefore} /> → <span className="font-medium text-text-primary"><Quantity value={preview.qtyAfter} /></span>
           </p>

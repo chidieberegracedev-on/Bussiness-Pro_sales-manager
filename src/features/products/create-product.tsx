@@ -4,6 +4,7 @@ import { useForm, useFieldArray } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
 import { Loader2 } from 'lucide-react'
+import Decimal from 'decimal.js'
 import { supabase } from '@/lib/supabase'
 import { toReadableError } from '@/lib/errors'
 import { uploadBusinessScopedImage, createSignedImageUrl, toUploadErrorMessage } from '@/lib/image-upload'
@@ -112,18 +113,29 @@ export function CreateProductPage() {
     if (!business) return
     setServerError(null)
 
-    const payload = values.variants.map((v) => ({
-      id: v.id,
-      option_values: v.optionValues,
-      variant_name: v.optionValues.length ? v.optionValues.join(' / ') : null,
-      sku: v.sku || null,
-      barcode: v.barcode || null,
-      selling_price: Number(v.sellingPrice || 0),
-      low_stock_threshold: Number(v.lowStockThreshold || 0),
-      opening_qty: Number(v.openingQty || 0),
-      opening_unit_cost: Number(v.costPrice || 0),
-      opening_movement_id: v.openingMovementId,
-    }))
+    // Cost is entered per PURCHASE unit when a purchase unit is set (Cost /
+    // Carton) but opening_unit_cost expects per BASE unit. Divide before
+    // sending so 14,900/carton with conversion 44 stores as 338.6364/piece
+    // in the ledger (FIX 007 §Issue 1). Selling price stays per base unit.
+    const conv = new Decimal(values.purchaseConversionQty || '0')
+    const shouldConvertCost = values.hasPurchaseUnit && conv.gt(0)
+
+    const payload = values.variants.map((v) => {
+      const enteredCost = new Decimal(v.costPrice || '0')
+      const perBaseCost = shouldConvertCost ? enteredCost.div(conv) : enteredCost
+      return {
+        id: v.id,
+        option_values: v.optionValues,
+        variant_name: v.optionValues.length ? v.optionValues.join(' / ') : null,
+        sku: v.sku || null,
+        barcode: v.barcode || null,
+        selling_price: Number(v.sellingPrice || 0),
+        low_stock_threshold: Number(v.lowStockThreshold || 0),
+        opening_qty: Number(v.openingQty || 0),
+        opening_unit_cost: perBaseCost.toNumber(),
+        opening_movement_id: v.openingMovementId,
+      }
+    })
 
     const { data, error } = await supabase.rpc('create_product', {
       p_business_id: business.id,
