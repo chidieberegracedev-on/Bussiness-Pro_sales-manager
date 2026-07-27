@@ -373,6 +373,27 @@ export interface Database {
         }
         Relationships: []
       }
+      v_inventory_value: {
+        Row: {
+          business_id: string
+          variant_count: string
+          total_units: string
+          total_cost_value: string
+          negative_variant_count: string
+        }
+        Relationships: []
+      }
+      v_inventory_value_by_category: {
+        Row: {
+          business_id: string
+          category_id: string | null
+          category_name: string | null
+          variant_count: string
+          total_units: string
+          total_cost_value: string
+        }
+        Relationships: []
+      }
     }
     Functions: {
       create_business: {
@@ -437,6 +458,44 @@ export interface Database {
         Args: { p_sale_id: string; p_reason?: string | null }
         Returns: Database['public']['Tables']['sales']['Row']
       }
+      dashboard_summary: {
+        Args: { p_business_id: string }
+        Returns: JsonB
+      }
+      sales_report: {
+        Args: { p_business_id: string; p_from: string; p_to: string }
+        Returns: JsonB
+      }
+      sales_timeseries: {
+        Args: { p_business_id: string; p_from: string; p_to: string; p_bucket?: string }
+        Returns: { bucket_start: string; revenue: string; cost: string; transactions: number }[]
+      }
+      product_performance: {
+        Args: { p_business_id: string; p_from: string; p_to: string }
+        Returns: {
+          product_id: string
+          product_name: string
+          units_sold: string
+          revenue: string
+          cost: string | null
+          gross_profit: string | null
+          last_sold_at: string | null
+        }[]
+      }
+      business_day_start: {
+        Args: { p_business_id: string; p_days_offset?: number }
+        Returns: string
+      }
+      business_week_start: {
+        Args: { p_business_id: string }
+        Returns: string
+      }
+      business_month_start: {
+        Args: { p_business_id: string }
+        Returns: string
+      }
     }
   }
 }
+
+type JsonB = Record<string, unknown>

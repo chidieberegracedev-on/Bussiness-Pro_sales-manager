@@ -20,6 +20,10 @@ import { MovementHistoryPage } from '@/features/inventory/movement-history'
 import { PosPage } from '@/features/pos/pos-page'
 import { SalesListPage } from '@/features/sales/sales-list'
 import { SaleDetailPage } from '@/features/sales/sale-detail'
+import { DashboardPage } from '@/features/analytics/dashboard'
+import { SalesReportPage } from '@/features/analytics/sales-report'
+import { ProductPerformancePage } from '@/features/analytics/product-performance'
+import { InventoryIntelligencePage } from '@/features/analytics/inventory-intelligence'
 import { NotFoundPage } from '@/features/misc/not-found'
 
 const MANAGE_ROLES = ['owner', 'manager'] as const
@@ -40,8 +44,9 @@ export function AppRouter() {
 
         <Route element={<RequireBusiness />}>
           <Route element={<AppShell />}>
-            <Route index element={<Navigate to="/products" replace />} />
+            <Route index element={<Navigate to="/dashboard" replace />} />
 
+            <Route path="/dashboard" element={<DashboardPage />} />
             <Route path="/pos" element={<PosPage />} />
             <Route path="/sales" element={<SalesListPage />} />
             <Route path="/sales/:id" element={<SaleDetailPage />} />
@@ -57,6 +62,10 @@ export function AppRouter() {
             </Route>
 
             <Route path="/inventory/low-stock" element={<LowStockPage />} />
+
+            <Route path="/reports/sales" element={<SalesReportPage />} />
+            <Route path="/reports/products" element={<ProductPerformancePage />} />
+            <Route path="/reports/inventory" element={<InventoryIntelligencePage />} />
 
             <Route path="/settings" element={<SettingsLayout />}>
               <Route index element={<SettingsIndexRedirect />} />
