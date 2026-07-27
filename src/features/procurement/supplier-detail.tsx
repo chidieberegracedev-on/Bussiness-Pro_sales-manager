@@ -195,7 +195,7 @@ export function SupplierDetailPage() {
             <EmptyState
               icon={Package}
               title="No linked products"
-              description="Link the products this supplier sells you, with the pack size (e.g. carton of 12 packs). This gives every PO the right conversion so 1 carton at ₦12,000 records as ₦1,000 per pack."
+              description="Link the products this supplier sells you, with the pack size (e.g. carton of 12 packs). This gives every PO the right conversion so a carton at 12,000 records as 1,000 per pack — no currency guessing."
               action={
                 canManage && (
                   <Button size="sm" onClick={() => setPickerOpen(true)}>

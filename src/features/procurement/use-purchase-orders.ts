@@ -138,7 +138,10 @@ export function useCreatePurchaseOrder() {
         p_status: input.status,
         p_note: input.note ?? null,
       })
-      if (error) throw error
+      if (error) {
+        console.error('[create_purchase_order] failed', { input, error })
+        throw error
+      }
       return data as PurchaseOrder
     },
     onSuccess: () => {
@@ -176,7 +179,17 @@ export function useReceiveGoods() {
         p_items: input.items,
         p_note: input.note ?? null,
       })
-      if (error) throw error
+      if (error) {
+        // Surface the real Postgres/PostgREST error before it gets wrapped.
+        // See FIX 006 §Issue 3 — silent "something went wrong" hid the cause.
+        console.error('[receive_goods] failed', {
+          poId: input.poId,
+          receiptId: input.receiptId,
+          items: input.items,
+          error,
+        })
+        throw error
+      }
       return data as GoodsReceipt
     },
     onSuccess: (_, variables) => {

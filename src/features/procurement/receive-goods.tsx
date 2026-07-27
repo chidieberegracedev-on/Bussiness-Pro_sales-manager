@@ -215,7 +215,8 @@ export function ReceiveGoodsPage() {
             <p className="text-sm font-medium text-text-primary">Cost is recorded per base unit</p>
             <p className="mt-0.5 text-sm text-text-secondary">
               Enter cost per <span className="font-medium">purchase unit</span> (e.g. per carton). The system divides
-              by the conversion so stock is valued per base unit — a ₦12,000 carton of 12 records as ₦1,000/pack.
+              by the conversion so stock is valued per base unit — a carton at{' '}
+              <Money value="12000" /> with a pack of 12 records as <Money value="1000" />/pack.
             </p>
           </div>
         </CardContent>

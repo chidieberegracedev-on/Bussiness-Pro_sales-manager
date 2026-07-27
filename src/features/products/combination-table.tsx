@@ -19,6 +19,10 @@ export function CombinationTable({
 }) {
   const [bulkPrice, setBulkPrice] = useState('')
   const [bulkCost, setBulkCost] = useState('')
+  const baseUnit = form.watch('baseUnit') || 'unit'
+  const hasPurchaseUnit = form.watch('hasPurchaseUnit')
+  const purchaseUnit = form.watch('purchaseUnit')
+  const costUnit = hasPurchaseUnit && purchaseUnit ? purchaseUnit : baseUnit
 
   function applyBulk() {
     fields.forEach((_, index) => {
@@ -50,9 +54,9 @@ export function CombinationTable({
           <TableHeader>
             <TableRow>
               <TableHead>Options</TableHead>
-              <TableHead className="w-32">Price</TableHead>
-              <TableHead className="w-32">Cost</TableHead>
-              <TableHead className="w-28">Opening qty</TableHead>
+              <TableHead className="w-32">Price / {baseUnit}</TableHead>
+              <TableHead className="w-32">Cost / {costUnit}</TableHead>
+              <TableHead className="w-28">Opening ({baseUnit})</TableHead>
               <TableHead className="w-32">SKU</TableHead>
               <TableHead className="w-32">Barcode</TableHead>
               <TableHead className="w-10" />

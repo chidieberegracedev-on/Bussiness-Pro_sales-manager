@@ -17,6 +17,12 @@ const SIGNAL_MAP: Array<[RegExp, string]> = [
   [/option value\(s\) but the product defines/i, "This item's options don't match the product's configuration."],
   [/exceeded the maximum allowed size|payload too large/i, 'That file is too large. Try a smaller image.'],
   [/mime type .* is not supported|file type isn't supported/i, "That file type isn't supported. Use a JPEG, PNG, WebP, or HEIC image."],
+  [/po item .* not on this order/i, "That line doesn't belong to this purchase order — refresh the page and try again."],
+  [/a receipt must contain at least one line/i, 'Enter what you actually received on at least one line.'],
+  [/cannot receive against a (cancelled|completed) purchase order/i, "This PO is closed — you can't receive more against it."],
+  [/a purchase order must contain at least one item/i, 'Add at least one item to the purchase order.'],
+  [/each po line needs a positive quantity/i, 'Every PO line needs a quantity greater than zero.'],
+  [/a new po status must be draft or ordered/i, "A new PO can only be saved as draft or ordered."],
 ]
 
 export function toReadableError(error: unknown): string {
@@ -33,6 +39,12 @@ export function toReadableError(error: unknown): string {
 
   for (const [pattern, message] of SIGNAL_MAP) {
     if (pattern.test(raw)) return message
+  }
+
+  // In development, surface the raw message so failures are debuggable
+  // instead of silently collapsing to a generic string (FIX 006 §Issue 3).
+  if (import.meta.env.DEV && raw) {
+    return raw
   }
 
   return 'Something went wrong. Please try again.'

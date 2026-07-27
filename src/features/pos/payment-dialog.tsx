@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { MoneyInput } from '@/components/money/money-input'
 import { Money } from '@/components/money/money'
+import { formatMoneyForInput } from '@/lib/money'
 import { SaleConfirmation } from '@/features/pos/sale-confirmation'
 import type { PaymentMethod } from '@/types/database'
 import type { Database } from '@/types/database'
@@ -46,7 +47,7 @@ export function PaymentDialog({ open, onOpenChange }: { open: boolean; onOpenCha
   // tendered above the total.
   useEffect(() => {
     if (open && !completedSale) {
-      setAmount(subtotal.toFixed(4))
+      setAmount(business ? formatMoneyForInput(subtotal, business.currency_exponent) : subtotal.toFixed(2))
       setMethod('cash')
       setError(null)
       // eslint-disable-next-line react-hooks/exhaustive-deps

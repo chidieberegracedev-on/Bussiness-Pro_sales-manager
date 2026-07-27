@@ -46,3 +46,15 @@ export function formatDecimalAmount(amount: MoneyInput, exponent: number, locale
     maximumFractionDigits: exponent,
   }).format(rounded.toNumber())
 }
+
+/**
+ * Formats a monetary value for an editable input at currency precision —
+ * "3000.0000" from the DB becomes "3000.00" for USD, "3000" for JPY, "3000.000"
+ * for KWD. Uses a locale-agnostic decimal point so the value parses back with
+ * `new Decimal(...)` on save (FIX 006 §Issue extra).
+ */
+export function formatMoneyForInput(amount: MoneyInput, exponent: number): string {
+  if (amount == null || amount === '') return ''
+  const rounded = roundToExponent(amount, exponent)
+  return rounded.toFixed(exponent)
+}

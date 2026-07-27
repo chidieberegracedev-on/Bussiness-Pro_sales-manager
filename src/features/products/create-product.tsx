@@ -13,6 +13,7 @@ import { useCategories } from '@/features/products/categories-hooks'
 import { createProductSchema, type CreateProductValues } from '@/features/products/schemas'
 import { OptionsBuilder, type OptionDef } from '@/features/products/options-builder'
 import { CombinationTable } from '@/features/products/combination-table'
+import { PricingHelperPreview, pricingLabel, thresholdLabel } from '@/features/products/pricing-helper'
 import { PageHeader } from '@/components/layout/page-header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -289,7 +290,7 @@ export function CreateProductPage() {
                     name="variants.0.sellingPrice"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Selling price</FormLabel>
+                        <FormLabel>{pricingLabel('Selling price', baseUnit || 'unit')}</FormLabel>
                         <FormControl>
                           <MoneyInput placeholder="0.00" {...field} />
                         </FormControl>
@@ -302,7 +303,12 @@ export function CreateProductPage() {
                     name="variants.0.costPrice"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Cost price</FormLabel>
+                        <FormLabel>
+                          {pricingLabel(
+                            'Cost price',
+                            hasPurchaseUnit && purchaseUnit ? purchaseUnit : baseUnit || 'unit',
+                          )}
+                        </FormLabel>
                         <FormControl>
                           <MoneyInput placeholder="0.00" {...field} />
                         </FormControl>
@@ -310,12 +316,20 @@ export function CreateProductPage() {
                       </FormItem>
                     )}
                   />
+                  <PricingHelperPreview
+                    hasPurchaseUnit={hasPurchaseUnit && !!purchaseUnit}
+                    purchaseUnit={purchaseUnit || ''}
+                    baseUnit={baseUnit || 'unit'}
+                    conversion={purchaseConversionQty || ''}
+                    costPrice={form.watch('variants.0.costPrice') || ''}
+                    sellingPrice={form.watch('variants.0.sellingPrice') || ''}
+                  />
                   <FormField
                     control={form.control}
                     name="variants.0.openingQty"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Opening quantity</FormLabel>
+                        <FormLabel>Opening quantity ({baseUnit || 'units'})</FormLabel>
                         <FormControl>
                           <QuantityInput placeholder="0" {...field} />
                         </FormControl>
@@ -328,7 +342,7 @@ export function CreateProductPage() {
                     name="variants.0.lowStockThreshold"
                     render={({ field }) => (
                       <FormItem>
-                        <FormLabel>Low-stock threshold</FormLabel>
+                        <FormLabel>{thresholdLabel(baseUnit || 'unit')}</FormLabel>
                         <FormControl>
                           <QuantityInput placeholder="0" {...field} />
                         </FormControl>

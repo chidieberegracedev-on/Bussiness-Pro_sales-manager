@@ -11,6 +11,7 @@ import { useSignedImageUrl } from '@/hooks/use-signed-image-url'
 import { PRODUCT_IMAGE_BUCKET } from '@/lib/storage-buckets'
 import { useActiveBusiness } from '@/features/business/hooks'
 import { toReadableError } from '@/lib/errors'
+import { formatMoneyForInput } from '@/lib/money'
 import { PageHeader } from '@/components/layout/page-header'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -86,7 +87,9 @@ export function EditProductPage() {
           label: variantLabel(v),
           sku: v.sku ?? '',
           barcode: v.barcode ?? '',
-          sellingPrice: v.selling_price,
+          sellingPrice: business
+            ? formatMoneyForInput(v.selling_price, business.currency_exponent)
+            : v.selling_price,
           lowStockThreshold: v.low_stock_threshold,
         })),
       })
@@ -252,8 +255,8 @@ export function EditProductPage() {
               <TableHeader>
                 <TableRow>
                   <TableHead>Variant</TableHead>
-                  <TableHead>Price</TableHead>
-                  <TableHead>Low-stock threshold</TableHead>
+                  <TableHead>Price / {product?.base_unit ?? 'unit'}</TableHead>
+                  <TableHead>Low-stock threshold ({product?.base_unit ?? 'units'})</TableHead>
                   <TableHead>SKU</TableHead>
                   <TableHead>Barcode</TableHead>
                 </TableRow>
