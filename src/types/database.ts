@@ -20,6 +20,9 @@ export type StockMovementType =
 export type StockStatus = 'negative' | 'out_of_stock' | 'low' | 'ok'
 export type SaleStatus = 'completed' | 'voided'
 export type PaymentMethod = 'cash' | 'card' | 'transfer' | 'other'
+export type PoStatus = 'draft' | 'ordered' | 'partially_received' | 'completed' | 'cancelled'
+export type PoItemStatus = 'pending' | 'partial' | 'complete'
+export type ReceiptDiscrepancy = 'none' | 'damaged' | 'wrong' | 'expired' | 'missing' | 'other'
 
 export interface Database {
   public: {
@@ -324,6 +327,164 @@ export interface Database {
           },
         ]
       }
+      suppliers: {
+        Row: {
+          id: string
+          business_id: string
+          name: string
+          phone: string | null
+          email: string | null
+          address: string | null
+          notes: string | null
+          is_active: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['suppliers']['Row']> & {
+          business_id: string
+          name: string
+        }
+        Update: Partial<Database['public']['Tables']['suppliers']['Row']>
+        Relationships: []
+      }
+      product_suppliers: {
+        Row: {
+          id: string
+          business_id: string
+          variant_id: string
+          supplier_id: string
+          supplier_sku: string | null
+          purchase_unit: string
+          conversion_to_base: string
+          last_purchase_cost: string | null
+          is_preferred: boolean
+          created_at: string
+          updated_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['product_suppliers']['Row']> & {
+          business_id: string
+          variant_id: string
+          supplier_id: string
+        }
+        Update: Partial<Database['public']['Tables']['product_suppliers']['Row']>
+        Relationships: [
+          {
+            foreignKeyName: 'product_suppliers_supplier_id_fkey'
+            columns: ['supplier_id']
+            isOneToOne: false
+            referencedRelation: 'suppliers'
+            referencedColumns: ['id']
+          },
+          {
+            foreignKeyName: 'product_suppliers_variant_id_fkey'
+            columns: ['variant_id']
+            isOneToOne: false
+            referencedRelation: 'product_variants'
+            referencedColumns: ['id']
+          },
+        ]
+      }
+      purchase_orders: {
+        Row: {
+          id: string
+          business_id: string
+          supplier_id: string
+          location_id: string
+          po_number: string
+          status: PoStatus
+          expected_total: string
+          currency_code: string
+          note: string | null
+          ordered_at: string | null
+          cancelled_at: string | null
+          created_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['purchase_orders']['Row']> & {
+          id: string
+          business_id: string
+          supplier_id: string
+          location_id: string
+          po_number: string
+          currency_code: string
+        }
+        Update: Partial<Database['public']['Tables']['purchase_orders']['Row']>
+        Relationships: []
+      }
+      purchase_order_items: {
+        Row: {
+          id: string
+          po_id: string
+          business_id: string
+          variant_id: string
+          product_name: string
+          purchase_unit: string
+          conversion_to_base: string
+          qty_ordered_purchase: string
+          expected_unit_cost: string
+          qty_received_base: string
+          status: PoItemStatus
+          created_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['purchase_order_items']['Row']> & {
+          po_id: string
+          business_id: string
+          variant_id: string
+          product_name: string
+          purchase_unit: string
+          conversion_to_base: string
+          qty_ordered_purchase: string
+        }
+        Update: Partial<Database['public']['Tables']['purchase_order_items']['Row']>
+        Relationships: []
+      }
+      goods_receipts: {
+        Row: {
+          id: string
+          po_id: string
+          business_id: string
+          location_id: string
+          received_by: string | null
+          received_at: string
+          note: string | null
+          created_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['goods_receipts']['Row']> & {
+          id: string
+          po_id: string
+          business_id: string
+          location_id: string
+        }
+        Update: Partial<Database['public']['Tables']['goods_receipts']['Row']>
+        Relationships: []
+      }
+      goods_receipt_items: {
+        Row: {
+          id: string
+          receipt_id: string
+          po_item_id: string
+          business_id: string
+          variant_id: string
+          qty_received_purchase: string
+          qty_good_base: string
+          qty_damaged_base: string
+          qty_discrepancy_base: string
+          discrepancy_reason: ReceiptDiscrepancy
+          unit_cost_purchase: string
+          unit_cost_base: string
+          note: string | null
+          created_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['goods_receipt_items']['Row']> & {
+          receipt_id: string
+          po_item_id: string
+          business_id: string
+          variant_id: string
+        }
+        Update: Partial<Database['public']['Tables']['goods_receipt_items']['Row']>
+        Relationships: []
+      }
     }
     Views: {
       v_variant_stock: {
@@ -391,6 +552,41 @@ export interface Database {
           variant_count: string
           total_units: string
           total_cost_value: string
+        }
+        Relationships: []
+      }
+      v_purchase_order_summary: {
+        Row: {
+          id: string
+          business_id: string
+          supplier_id: string
+          supplier_name: string
+          po_number: string
+          status: PoStatus
+          expected_total: string
+          currency_code: string
+          ordered_at: string | null
+          created_at: string
+          item_count: string
+          received_value: string
+        }
+        Relationships: []
+      }
+      v_purchase_history: {
+        Row: {
+          business_id: string
+          variant_id: string
+          product_name: string
+          po_id: string
+          po_number: string
+          supplier_id: string
+          supplier_name: string
+          received_at: string
+          qty_good_base: string
+          unit_cost_base: string
+          unit_cost_purchase: string
+          purchase_unit: string
+          line_value: string
         }
         Relationships: []
       }
@@ -493,6 +689,44 @@ export interface Database {
       business_month_start: {
         Args: { p_business_id: string }
         Returns: string
+      }
+      create_purchase_order: {
+        Args: {
+          p_po_id: string
+          p_business_id: string
+          p_supplier_id: string
+          p_items: unknown
+          p_location_id?: string | null
+          p_status?: string
+          p_note?: string | null
+        }
+        Returns: Database['public']['Tables']['purchase_orders']['Row']
+      }
+      receive_goods: {
+        Args: {
+          p_receipt_id: string
+          p_po_id: string
+          p_items: unknown
+          p_note?: string | null
+        }
+        Returns: Database['public']['Tables']['goods_receipts']['Row']
+      }
+      restock_suggestions: {
+        Args: { p_business_id: string }
+        Returns: {
+          supplier_id: string | null
+          supplier_name: string | null
+          variant_id: string
+          product_name: string
+          variant_name: string | null
+          qty_on_hand: string
+          low_stock_threshold: string
+          suggested_qty_base: string
+          purchase_unit: string
+          conversion_to_base: string
+          suggested_qty_purchase: string
+          last_purchase_cost: string | null
+        }[]
       }
     }
   }

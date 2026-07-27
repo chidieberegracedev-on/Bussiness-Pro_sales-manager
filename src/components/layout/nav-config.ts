@@ -10,6 +10,10 @@ import {
   BarChart3,
   TrendingUp,
   Warehouse,
+  Truck,
+  FileText,
+  ShoppingBag,
+  Repeat,
 } from 'lucide-react'
 import type { MemberRole } from '@/types/database'
 
@@ -33,6 +37,17 @@ export const NAV_ITEMS: NavItem[] = [
     children: [
       { label: 'Low stock', to: '/inventory/low-stock', icon: AlertTriangle },
       { label: 'Stock movements', to: '/inventory/movements', icon: History, roles: ['owner', 'manager'] },
+    ],
+  },
+  {
+    label: 'Purchasing',
+    to: '/purchase-orders',
+    icon: ShoppingBag,
+    children: [
+      { label: 'Purchase Orders', to: '/purchase-orders', icon: FileText },
+      { label: 'Suppliers', to: '/suppliers', icon: Truck },
+      { label: 'Restock', to: '/restock', icon: Repeat, roles: ['owner', 'manager'] },
+      { label: 'Purchase History', to: '/purchase-history', icon: History },
     ],
   },
   {

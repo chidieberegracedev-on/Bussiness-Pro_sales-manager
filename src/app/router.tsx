@@ -24,6 +24,15 @@ import { DashboardPage } from '@/features/analytics/dashboard'
 import { SalesReportPage } from '@/features/analytics/sales-report'
 import { ProductPerformancePage } from '@/features/analytics/product-performance'
 import { InventoryIntelligencePage } from '@/features/analytics/inventory-intelligence'
+import { SupplierListPage } from '@/features/procurement/supplier-list'
+import { SupplierFormPage } from '@/features/procurement/supplier-form'
+import { SupplierDetailPage } from '@/features/procurement/supplier-detail'
+import { PurchaseOrdersListPage } from '@/features/procurement/po-list'
+import { CreatePurchaseOrderPage } from '@/features/procurement/create-purchase-order'
+import { PurchaseOrderDetailPage } from '@/features/procurement/po-detail'
+import { ReceiveGoodsPage } from '@/features/procurement/receive-goods'
+import { RestockPage } from '@/features/procurement/restock-page'
+import { PurchaseHistoryPage } from '@/features/procurement/purchase-history'
 import { NotFoundPage } from '@/features/misc/not-found'
 
 const MANAGE_ROLES = ['owner', 'manager'] as const
@@ -66,6 +75,23 @@ export function AppRouter() {
             <Route path="/reports/sales" element={<SalesReportPage />} />
             <Route path="/reports/products" element={<ProductPerformancePage />} />
             <Route path="/reports/inventory" element={<InventoryIntelligencePage />} />
+
+            <Route path="/suppliers" element={<SupplierListPage />} />
+            <Route path="/suppliers/:id" element={<SupplierDetailPage />} />
+            <Route element={<RequireRole roles={[...MANAGE_ROLES]} />}>
+              <Route path="/suppliers/new" element={<SupplierFormPage mode="create" />} />
+              <Route path="/suppliers/:id/edit" element={<SupplierFormPage mode="edit" />} />
+            </Route>
+
+            <Route path="/purchase-orders" element={<PurchaseOrdersListPage />} />
+            <Route path="/purchase-orders/:id" element={<PurchaseOrderDetailPage />} />
+            <Route path="/purchase-orders/:id/receive" element={<ReceiveGoodsPage />} />
+            <Route element={<RequireRole roles={[...MANAGE_ROLES]} />}>
+              <Route path="/purchase-orders/new" element={<CreatePurchaseOrderPage />} />
+              <Route path="/restock" element={<RestockPage />} />
+            </Route>
+
+            <Route path="/purchase-history" element={<PurchaseHistoryPage />} />
 
             <Route path="/settings" element={<SettingsLayout />}>
               <Route index element={<SettingsIndexRedirect />} />
