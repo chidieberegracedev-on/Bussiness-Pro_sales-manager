@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import Decimal from 'decimal.js'
 import { supabase } from '@/lib/supabase'
 import { useActiveBusiness } from '@/features/business/hooks'
 import type { Database } from '@/types/database'
@@ -99,11 +100,14 @@ export function useOpenShiftMutation() {
   return useMutation({
     mutationFn: async (input: { locationId: string; openingFloat: string }) => {
       const shiftId = crypto.randomUUID()
+      const floatDecimal = new Decimal(input.openingFloat || '0')
       const { data, error } = await supabase.rpc('open_shift', {
         p_shift_id: shiftId,
         p_business_id: business!.id,
         p_location_id: input.locationId,
-        p_opening_float: Number(input.openingFloat || '0'),
+        // numeric-typed RPC arg — pass a decimal string so precision survives
+        // and JS float coercion never sneaks in (Fix 009 §Issue 3 cause B).
+        p_opening_float: floatDecimal.toString() as unknown as number,
       })
       if (error) {
         console.error('[open_shift] failed', { input, error })
@@ -124,9 +128,17 @@ export function useCloseShiftMutation() {
 
   return useMutation({
     mutationFn: async (input: { shiftId: string; countedCash: string; note?: string }) => {
+      const trimmed = input.countedCash.trim()
+      if (!trimmed || Number.isNaN(Number(trimmed))) {
+        throw new Error('Enter a counted amount before closing the shift.')
+      }
+      const countedDecimal = new Decimal(trimmed)
       const { data, error } = await supabase.rpc('close_shift', {
         p_shift_id: input.shiftId,
-        p_counted_cash: Number(input.countedCash),
+        // Send as decimal string — the RPC's numeric arg accepts it via
+        // PostgREST cast, and this avoids any JS number-precision loss on
+        // large amounts (Fix 009 §Issue 3 cause C).
+        p_counted_cash: countedDecimal.toString() as unknown as number,
         p_note: input.note ?? null,
       })
       if (error) {
@@ -162,7 +174,7 @@ export function useTransferCash() {
         p_business_id: business!.id,
         p_from: input.from,
         p_to: input.to,
-        p_amount: Number(input.amount),
+        p_amount: new Decimal(input.amount).toString() as unknown as number,
         p_shift_id: input.shiftId ?? null,
         p_note: input.note ?? null,
       })

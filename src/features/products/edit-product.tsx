@@ -95,8 +95,12 @@ export function EditProductPage() {
       })
       setImagePath(product.image_path)
     }
+    // Include categories?.length so the Select re-picks the label once
+    // categories finish loading — otherwise the categoryId is set on the form
+    // but the matching SelectItem doesn't exist yet, and the user sees
+    // "No category" (Fix 009 §Issue 1).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [product?.id, variants?.length])
+  }, [product?.id, variants?.length, categories?.length])
 
   const hasPurchaseUnit = form.watch('hasPurchaseUnit')
 

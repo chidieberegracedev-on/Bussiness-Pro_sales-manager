@@ -29,48 +29,85 @@ export function PricingHelperPreview({
   const cost = new Decimal(costPrice || '0')
   const sell = new Decimal(sellingPrice || '0')
 
-  const showPurchase = hasPurchaseUnit && purchaseUnit && conv.gt(0) && cost.gt(0)
+  // "Different-unit mode" needs the conversion to divide cost.
+  const differentUnit = hasPurchaseUnit && !!purchaseUnit && conv.gt(0)
+
+  const showPurchase = cost.gt(0)
   const showSales = sell.gt(0)
   if (!showPurchase && !showSales) return null
 
-  const perBaseCost = showPurchase ? cost.div(conv) : new Decimal(0)
-  const revenuePerCarton = showSales && hasPurchaseUnit && conv.gt(0) ? sell.times(conv) : null
-  const profitPerCarton =
-    showPurchase && showSales ? sell.minus(perBaseCost).times(conv) : null
+  // In same-unit mode, cost IS the per-base cost. In different-unit mode,
+  // divide by conversion (Fix 009 §Issue 2 — helper must show purchase
+  // side in both modes).
+  const perBaseCost = differentUnit ? cost.div(conv) : cost
+  const revenuePerPurchase = showSales && differentUnit ? sell.times(conv) : null
+  const profitPerBase = showPurchase && showSales ? sell.minus(perBaseCost) : null
+  const profitPerPurchase = differentUnit && profitPerBase ? profitPerBase.times(conv) : null
 
   return (
     <div className="col-span-2 rounded-md border border-accent-primary/20 bg-accent-primary/5 p-3 text-sm text-text-secondary">
       {showPurchase && (
         <div className="space-y-1">
           <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Purchase</p>
-          <p>
-            1 <span className="font-medium">{purchaseUnit}</span> = <Money value={cost.toString()} />
-          </p>
-          <p>
-            ≈ <span className="font-semibold text-accent-primary"><Money value={perBaseCost.toFixed(4)} /></span> per {baseUnit}
-          </p>
+          {differentUnit ? (
+            <>
+              <p>
+                1 <span className="font-medium">{purchaseUnit}</span> = <Money value={cost.toString()} />
+              </p>
+              <p>
+                ≈{' '}
+                <span className="font-semibold text-accent-primary">
+                  <Money value={perBaseCost.toFixed(4)} />
+                </span>{' '}
+                per {baseUnit}
+              </p>
+            </>
+          ) : (
+            <p>
+              Cost:{' '}
+              <span className="font-semibold text-accent-primary">
+                <Money value={cost.toString()} />
+              </span>{' '}
+              per {baseUnit}
+            </p>
+          )}
         </div>
       )}
       {showSales && (
         <div className={showPurchase ? 'mt-3 space-y-1 border-t border-accent-primary/20 pt-3' : 'space-y-1'}>
           <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Sales</p>
           <p>
-            <span className="font-medium"><Money value={sell.toString()} /></span> per {baseUnit}
+            <span className="font-medium">
+              <Money value={sell.toString()} />
+            </span>{' '}
+            per {baseUnit}
           </p>
-          {revenuePerCarton && (
-            <p>
-              ≈ <span className="font-medium"><Money value={revenuePerCarton.toFixed(4)} /></span> revenue per {purchaseUnit}
-            </p>
-          )}
-          {profitPerCarton && (
+          {revenuePerPurchase && (
             <p>
               ≈{' '}
-              <span className={profitPerCarton.gte(0) ? 'font-semibold text-success' : 'font-semibold text-danger'}>
-                <Money value={profitPerCarton.toFixed(4)} />
+              <span className="font-medium">
+                <Money value={revenuePerPurchase.toFixed(4)} />
+              </span>{' '}
+              revenue per {purchaseUnit}
+            </p>
+          )}
+          {profitPerPurchase ? (
+            <p>
+              ≈{' '}
+              <span className={profitPerPurchase.gte(0) ? 'font-semibold text-success' : 'font-semibold text-danger'}>
+                <Money value={profitPerPurchase.toFixed(4)} />
               </span>{' '}
               gross profit per {purchaseUnit} <span className="text-xs text-text-muted">(estimate)</span>
             </p>
-          )}
+          ) : profitPerBase ? (
+            <p>
+              ≈{' '}
+              <span className={profitPerBase.gte(0) ? 'font-semibold text-success' : 'font-semibold text-danger'}>
+                <Money value={profitPerBase.toFixed(4)} />
+              </span>{' '}
+              gross profit per {baseUnit} <span className="text-xs text-text-muted">(estimate)</span>
+            </p>
+          ) : null}
         </div>
       )}
     </div>

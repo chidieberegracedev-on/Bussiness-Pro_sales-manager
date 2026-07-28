@@ -40,6 +40,7 @@ export function CloseShiftPage() {
 
   const [countedCash, setCountedCash] = useState('')
   const [note, setNote] = useState('')
+  const [closeError, setCloseError] = useState<string | null>(null)
   const [transferOpen, setTransferOpen] = useState<null | { from: 'cash' | 'safe' | 'petty_cash'; to: 'cash' | 'safe' | 'petty_cash' }>(null)
 
   const mode: Mode = useMemo(() => {
@@ -62,6 +63,7 @@ export function CloseShiftPage() {
 
   async function submitCount() {
     if (!shift || !countedCash) return
+    setCloseError(null)
     try {
       const closed = await closeMutation.mutateAsync({
         shiftId: shift.id,
@@ -74,10 +76,12 @@ export function CloseShiftPage() {
         description: variance.eq(0) ? 'Count matched expected.' : `Variance: ${variance.toString()}`,
       })
     } catch (error) {
+      const message = toReadableError(error)
+      setCloseError(message)
       toast({
         variant: 'destructive',
         title: "Couldn't close shift",
-        description: toReadableError(error),
+        description: message,
       })
     }
   }
@@ -119,14 +123,21 @@ export function CloseShiftPage() {
           </div>
 
           {mode === 'live' && (
-            <BlindCountForm
-              onSubmit={submitCount}
-              countedCash={countedCash}
-              onCountChange={setCountedCash}
-              note={note}
-              onNoteChange={setNote}
-              submitting={closeMutation.isPending}
-            />
+            <>
+              <BlindCountForm
+                onSubmit={submitCount}
+                countedCash={countedCash}
+                onCountChange={setCountedCash}
+                note={note}
+                onNoteChange={setNote}
+                submitting={closeMutation.isPending}
+              />
+              {closeError && (
+                <p role="alert" className="rounded-md border border-danger/30 bg-danger/5 px-3 py-2 text-sm text-danger">
+                  {closeError}
+                </p>
+              )}
+            </>
           )}
 
           {mode === 'closed' && <ClosedShiftResult shift={shift} />}

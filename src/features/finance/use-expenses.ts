@@ -1,4 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import Decimal from 'decimal.js'
 import { supabase } from '@/lib/supabase'
 import { useActiveBusiness } from '@/features/business/hooks'
 import type { CashSource, Database } from '@/types/database'
@@ -70,7 +71,8 @@ export function useRecordExpense() {
       const { data, error } = await supabase.rpc('record_expense', {
         p_expense_id: crypto.randomUUID(),
         p_business_id: business!.id,
-        p_amount: Number(input.amount),
+        // Decimal string preserves precision on the numeric-typed RPC arg.
+        p_amount: new Decimal(input.amount).toString() as unknown as number,
         p_paid_from: input.paidFrom,
         p_category_id: input.categoryId ?? null,
         p_description: input.description ?? null,

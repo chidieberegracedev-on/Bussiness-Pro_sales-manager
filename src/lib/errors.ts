@@ -23,6 +23,15 @@ const SIGNAL_MAP: Array<[RegExp, string]> = [
   [/a purchase order must contain at least one item/i, 'Add at least one item to the purchase order.'],
   [/each po line needs a positive quantity/i, 'Every PO line needs a quantity greater than zero.'],
   [/a new po status must be draft or ordered/i, "A new PO can only be saved as draft or ordered."],
+  [/a shift is already open at this location/i, 'A shift is already open at this location. Close it first.'],
+  [/a counted cash amount is required/i, 'Enter the counted cash amount before submitting.'],
+  [/shift not found/i, "That shift couldn't be found — it may have been removed."],
+  [/expense amount must be positive/i, 'The expense amount must be greater than zero.'],
+  [/expense must be paid from cash, bank, or petty_cash/i, 'Choose Cash, Bank, or Petty cash for how the expense was paid.'],
+  [/transfer amount must be positive/i, 'Enter an amount greater than zero to move.'],
+  [/source and destination differ/i, 'The source and destination must be different accounts.'],
+  [/financial position is available to owners and managers/i, 'Ask an owner or manager for the financial overview.'],
+  [/insufficient permission to (open|close) (a )?shift/i, "You don't have permission to run cash-drawer shifts."],
 ]
 
 export function toReadableError(error: unknown): string {
