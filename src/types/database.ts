@@ -23,6 +23,33 @@ export type PaymentMethod = 'cash' | 'card' | 'transfer' | 'other'
 export type PoStatus = 'draft' | 'ordered' | 'partially_received' | 'completed' | 'cancelled'
 export type PoItemStatus = 'pending' | 'partial' | 'complete'
 export type ReceiptDiscrepancy = 'none' | 'damaged' | 'wrong' | 'expired' | 'missing' | 'other'
+export type FinancialAccount =
+  | 'cash'
+  | 'bank'
+  | 'safe'
+  | 'petty_cash'
+  | 'supplier_payable'
+  | 'revenue'
+  | 'cogs'
+  | 'expense'
+export type FinancialDirection = 'debit' | 'credit'
+export type FinancialEventType =
+  | 'sale_revenue'
+  | 'sale_cogs'
+  | 'cash_in'
+  | 'bank_in'
+  | 'expense'
+  | 'supplier_payable_add'
+  | 'supplier_payment'
+  | 'safe_drop_out'
+  | 'safe_drop_in'
+  | 'petty_cash_out'
+  | 'petty_cash_fund'
+  | 'float_open'
+  | 'drawer_variance'
+  | 'adjustment'
+export type ShiftStatus = 'open' | 'closed'
+export type CashSource = 'cash' | 'bank' | 'petty_cash'
 
 export interface Database {
   public: {
@@ -485,6 +512,106 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['goods_receipt_items']['Row']>
         Relationships: []
       }
+      bank_accounts: {
+        Row: {
+          id: string
+          business_id: string
+          name: string
+          is_default: boolean
+          is_active: boolean
+          created_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['bank_accounts']['Row']> & { business_id: string }
+        Update: Partial<Database['public']['Tables']['bank_accounts']['Row']>
+        Relationships: []
+      }
+      expense_categories: {
+        Row: {
+          id: string
+          business_id: string
+          name: string
+          is_active: boolean
+          created_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['expense_categories']['Row']> & {
+          business_id: string
+          name: string
+        }
+        Update: Partial<Database['public']['Tables']['expense_categories']['Row']>
+        Relationships: []
+      }
+      cash_shifts: {
+        Row: {
+          id: string
+          business_id: string
+          location_id: string
+          opened_by: string | null
+          opened_at: string
+          opening_float: string
+          closed_by: string | null
+          closed_at: string | null
+          counted_cash: string | null
+          expected_cash: string | null
+          variance: string | null
+          status: ShiftStatus
+          note: string | null
+          created_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['cash_shifts']['Row']> & {
+          id: string
+          business_id: string
+          location_id: string
+        }
+        Update: Partial<Database['public']['Tables']['cash_shifts']['Row']>
+        Relationships: []
+      }
+      expenses: {
+        Row: {
+          id: string
+          business_id: string
+          location_id: string | null
+          category_id: string | null
+          amount: string
+          currency_code: string
+          paid_from: CashSource
+          bank_account_id: string | null
+          description: string | null
+          receipt_path: string | null
+          shift_id: string | null
+          spent_at: string
+          recorded_by: string | null
+          created_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['expenses']['Row']> & {
+          id: string
+          business_id: string
+        }
+        Update: never
+        Relationships: []
+      }
+      financial_events: {
+        Row: {
+          id: string
+          business_id: string
+          event_type: FinancialEventType
+          account: FinancialAccount
+          direction: FinancialDirection
+          amount: string
+          currency_code: string
+          bank_account_id: string | null
+          shift_id: string | null
+          category_id: string | null
+          reference_type: string | null
+          reference_id: string | null
+          occurred_at: string
+          created_by: string | null
+          note: string | null
+          created_at: string
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
     }
     Views: {
       v_variant_stock: {
@@ -590,6 +717,23 @@ export interface Database {
         }
         Relationships: []
       }
+      v_cashbook: {
+        Row: {
+          id: string
+          business_id: string
+          occurred_at: string
+          event_type: FinancialEventType
+          account: FinancialAccount
+          signed_amount: string
+          amount: string
+          currency_code: string
+          reference_type: string | null
+          reference_id: string | null
+          shift_id: string | null
+          note: string | null
+        }
+        Relationships: []
+      }
     }
     Functions: {
       create_business: {
@@ -647,6 +791,7 @@ export interface Database {
           p_items: unknown
           p_payments?: unknown
           p_note?: string | null
+          p_shift_id?: string | null
         }
         Returns: Database['public']['Tables']['sales']['Row']
       }
@@ -727,6 +872,62 @@ export interface Database {
           suggested_qty_purchase: string
           last_purchase_cost: string | null
         }[]
+      }
+      account_balance: {
+        Args: { p_business_id: string; p_account: FinancialAccount }
+        Returns: string
+      }
+      financial_position: {
+        Args: { p_business_id: string }
+        Returns: {
+          cash: string
+          bank: string
+          safe: string
+          petty_cash: string
+          supplier_payable: string
+          available_cash: string
+          currency_code: string
+        }
+      }
+      record_expense: {
+        Args: {
+          p_expense_id: string
+          p_business_id: string
+          p_amount: number
+          p_paid_from?: CashSource
+          p_category_id?: string | null
+          p_description?: string | null
+          p_location_id?: string | null
+          p_shift_id?: string | null
+          p_receipt_path?: string | null
+          p_spent_at?: string
+        }
+        Returns: Database['public']['Tables']['expenses']['Row']
+      }
+      open_shift: {
+        Args: {
+          p_shift_id: string
+          p_business_id: string
+          p_location_id: string
+          p_opening_float?: number
+        }
+        Returns: Database['public']['Tables']['cash_shifts']['Row']
+      }
+      close_shift: {
+        Args: { p_shift_id: string; p_counted_cash: number; p_note?: string | null }
+        Returns: Database['public']['Tables']['cash_shifts']['Row']
+      }
+      transfer_cash: {
+        Args: {
+          p_event_id: string
+          p_business_id: string
+          p_from: CashSource | 'safe'
+          p_to: CashSource | 'safe'
+          p_amount: number
+          p_shift_id?: string | null
+          p_note?: string | null
+        }
+        Returns: void
       }
     }
   }

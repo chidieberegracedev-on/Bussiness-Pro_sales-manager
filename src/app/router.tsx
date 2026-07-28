@@ -33,6 +33,13 @@ import { PurchaseOrderDetailPage } from '@/features/procurement/po-detail'
 import { ReceiveGoodsPage } from '@/features/procurement/receive-goods'
 import { RestockPage } from '@/features/procurement/restock-page'
 import { PurchaseHistoryPage } from '@/features/procurement/purchase-history'
+import { FinanceDashboardPage } from '@/features/finance/finance-dashboard'
+import { CashbookPage } from '@/features/finance/cashbook-page'
+import { ExpensesPage } from '@/features/finance/expenses-page'
+import { ExpenseCategoriesPage } from '@/features/finance/expense-categories-page'
+import { ShiftsListPage } from '@/features/finance/shifts-list-page'
+import { OpenShiftPage } from '@/features/finance/open-shift-page'
+import { CloseShiftPage } from '@/features/finance/close-shift-page'
 import { NotFoundPage } from '@/features/misc/not-found'
 
 const MANAGE_ROLES = ['owner', 'manager'] as const
@@ -92,6 +99,17 @@ export function AppRouter() {
             </Route>
 
             <Route path="/purchase-history" element={<PurchaseHistoryPage />} />
+
+            <Route path="/expenses" element={<ExpensesPage />} />
+            <Route path="/shifts" element={<ShiftsListPage />} />
+            <Route path="/shifts/open" element={<OpenShiftPage />} />
+            <Route path="/shifts/:id/close" element={<CloseShiftPage />} />
+
+            <Route element={<RequireRole roles={[...MANAGE_ROLES]} />}>
+              <Route path="/finance" element={<FinanceDashboardPage />} />
+              <Route path="/finance/cashbook" element={<CashbookPage />} />
+              <Route path="/expenses/categories" element={<ExpenseCategoriesPage />} />
+            </Route>
 
             <Route path="/settings" element={<SettingsLayout />}>
               <Route index element={<SettingsIndexRedirect />} />

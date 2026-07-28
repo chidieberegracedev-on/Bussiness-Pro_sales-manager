@@ -14,6 +14,10 @@ import {
   FileText,
   ShoppingBag,
   Repeat,
+  Wallet,
+  Clock,
+  BookOpen,
+  DollarSign,
 } from 'lucide-react'
 import type { MemberRole } from '@/types/database'
 
@@ -48,6 +52,17 @@ export const NAV_ITEMS: NavItem[] = [
       { label: 'Suppliers', to: '/suppliers', icon: Truck },
       { label: 'Restock', to: '/restock', icon: Repeat, roles: ['owner', 'manager'] },
       { label: 'Purchase History', to: '/purchase-history', icon: History },
+    ],
+  },
+  {
+    label: 'Finance',
+    to: '/expenses',
+    icon: Wallet,
+    children: [
+      { label: 'Overview', to: '/finance', icon: DollarSign, roles: ['owner', 'manager'] },
+      { label: 'Cashbook', to: '/finance/cashbook', icon: BookOpen, roles: ['owner', 'manager'] },
+      { label: 'Expenses', to: '/expenses', icon: Receipt },
+      { label: 'Shifts', to: '/shifts', icon: Clock },
     ],
   },
   {
