@@ -11,6 +11,7 @@ import {
   Info,
   Loader2,
   X,
+  Crown,
 } from 'lucide-react'
 import { PageHeader } from '@/components/layout/page-header'
 import { Button } from '@/components/ui/button'
@@ -30,6 +31,7 @@ import {
 } from '@/features/control/use-terminals'
 import { ROLE_DESCRIPTIONS, ROLE_LABELS } from '@/features/control/roles'
 import { useActiveBusiness } from '@/features/business/hooks'
+import { useAuthStore } from '@/features/auth/store'
 import { useLocale } from '@/features/auth/use-locale'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { formatDate, formatDateTime } from '@/lib/format'
@@ -48,6 +50,7 @@ const ASSIGNABLE_ROLES: MemberRole[] = ['owner', 'manager', 'inventory_staff', '
 export function EmployeeDirectoryPage() {
   const { business, role: myRole } = useActiveBusiness()
   const locale = useLocale()
+  const myUserId = useAuthStore((s) => s.user?.id)
   const isOwner = myRole === 'owner'
 
   const { data: employees, isLoading, isError, refetch } = useEmployees()
@@ -75,6 +78,12 @@ export function EmployeeDirectoryPage() {
     [employees],
   )
 
+  // The signed-in account holder's own operator record — they need a PIN too.
+  const myMembership = useMemo(
+    () => (employees ?? []).find((e) => e.user_id === myUserId),
+    [employees, myUserId],
+  )
+
   async function patch(values: Parameters<typeof updateEmployee.mutateAsync>[0]) {
     try {
       await updateEmployee.mutateAsync(values)
@@ -91,29 +100,46 @@ export function EmployeeDirectoryPage() {
   return (
     <div>
       <PageHeader
-        title="Employees"
-        description="Everyone who works this business, what they're allowed to do, and how they sign in at a till."
+        title="Operators"
+        description="Everyone who works this business, what they're allowed to do, and the PIN they sign in with."
       />
 
-      {/* How a person joins — the schema requires a real account, so say so plainly. */}
+      {/* The whole model in two lines, so nobody goes looking for an invite. */}
       <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-info/30 bg-info/5 p-3">
         <Info className="mt-0.5 size-4 shrink-0 text-info" />
         <div className="text-sm">
-          <p className="font-medium text-text-primary">Adding someone new</p>
+          <p className="font-medium text-text-primary">How operators sign in</p>
           <p className="mt-0.5 text-text-secondary">
-            A person signs up for their own account and joins this business — then they appear here,
-            where you set their name, role, and PIN. Their PIN is what identifies them at a terminal;
-            they never need the business email and password.
+            This business has one account — the email and password you signed in with. Everyone else
+            is an operator inside it: they pick their name at a terminal and enter their own 4-digit
+            PIN. No operator ever has their own email, password, or account.
           </p>
         </div>
       </div>
+
+      {/* The owner is an operator too, and needs a PIN to reach their workspace. */}
+      {myMembership && !myMembership.has_pin && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-warning/40 bg-warning/5 p-3">
+          <Crown className="size-5 shrink-0 text-warning" />
+          <div className="min-w-0 flex-1 text-sm">
+            <p className="font-medium text-text-primary">Set your own PIN</p>
+            <p className="mt-0.5 text-text-secondary">
+              You sign in as an operator too. Your PIN unlocks the full management workspace at any
+              terminal, without exposing the business password.
+            </p>
+          </div>
+          <Button size="sm" onClick={() => setPinTarget(myMembership)}>
+            <KeyRound className="size-3.5" /> Set my PIN
+          </Button>
+        </div>
+      )}
 
       {withoutPin > 0 && (
         <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-warning/30 bg-warning/5 p-3">
           <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warning" />
           <p className="text-sm text-text-secondary">
-            {withoutPin} active {withoutPin === 1 ? 'person has' : 'people have'} no PIN yet, so they
-            can't sign in at a terminal.
+            {withoutPin} active {withoutPin === 1 ? 'operator has' : 'operators have'} no PIN yet, so
+            they can't sign in at a terminal.
           </p>
         </div>
       )}
@@ -163,8 +189,8 @@ export function EmployeeDirectoryPage() {
       {!isLoading && !isError && employees && employees.length === 0 && (
         <EmptyState
           icon={Users}
-          title="No one here yet"
-          description="Once someone joins this business, they appear here so you can set their role and PIN."
+          title="No operators yet"
+          description="Operators are the people who work this business. Each one gets a role and a PIN — that PIN is how they sign in at a terminal."
         />
       )}
 
@@ -291,8 +317,8 @@ export function EmployeeDirectoryPage() {
 
       <p className="mt-6 text-xs text-text-muted">
         PINs are stored as one-way hashes — nobody, including owners, can read an existing PIN back.
-        It can only be replaced. Five wrong attempts locks that person out for 15 minutes.
-        {!isOwner && ' Only an owner can change roles or deactivate someone.'}
+        It can only be replaced. Five wrong attempts locks that operator out for 15 minutes.
+        {!isOwner && ' Only an owner can change roles or deactivate an operator.'}
       </p>
 
       {pinTarget && <SetPinDialog employee={pinTarget} onClose={() => setPinTarget(null)} />}

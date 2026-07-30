@@ -1,27 +1,43 @@
-import { useState } from 'react'
+import { create } from 'zustand'
 import { Navigate, Outlet } from 'react-router-dom'
 import { useEmployeeSessionStore } from '@/features/control/session-store'
 import { useRestoreSession, useAutoLock, useTerminalEmployees } from '@/features/control/use-session'
-import { LockScreen } from '@/features/control/lock-screen'
+import { OperatorSelectionScreen } from '@/features/control/operator-selection'
 import { RegistryWorkspace } from '@/features/control/registry-workspace'
-import {
-  OperatorChoiceScreen,
-  useOperatorChoiceStore,
-} from '@/features/control/operator-gate'
 import { FullPageLoading } from '@/components/layout/full-page-loading'
 import { PermissionDeniedState } from '@/components/data/error-state'
 import { useActiveBusiness } from '@/features/business/hooks'
 import type { MemberRole } from '@/types/database'
 
+const BOOTSTRAP_KEY = 'bp-setup-bootstrap'
+
+interface BootstrapState {
+  /**
+   * Set only when no operator has a PIN yet, so the account holder can reach
+   * Employees and create the first PINs. Cleared as soon as PINs exist.
+   */
+  bootstrapping: boolean
+  setBootstrapping: (value: boolean) => void
+}
+
+export const useBootstrapStore = create<BootstrapState>((set) => ({
+  bootstrapping: sessionStorage.getItem(BOOTSTRAP_KEY) === 'true',
+  setBootstrapping: (value) => {
+    if (value) sessionStorage.setItem(BOOTSTRAP_KEY, 'true')
+    else sessionStorage.removeItem(BOOTSTRAP_KEY)
+    set({ bootstrapping: value })
+  },
+}))
+
 /**
- * Decides which workspace a request lands in.
+ * Decides which workspace loads.
  *
- * A PIN session, when present, is authoritative: a cashier session gets the
- * Registry and nothing else. With no PIN session the device account's own role
- * governs, which is how an owner keeps working without a PIN.
+ * The Supabase session authenticates the BUSINESS. It does not, by itself,
+ * grant a workspace — the operator does. So every route below this gate needs a
+ * PIN session, and the role that `pin_unlock` returned decides what renders.
  *
- * This is UX routing only. The server rejects out-of-role actions regardless of
- * what renders here (BR-C2.6 / BR-C6.3).
+ * The one exception is bootstrap: a business whose operators have no PINs yet
+ * would otherwise be locked out of the screen where PINs are set.
  */
 export function WorkspaceGate() {
   useRestoreSession()
@@ -29,50 +45,48 @@ export function WorkspaceGate() {
   const token = useEmployeeSessionStore((s) => s.token)
   const context = useEmployeeSessionStore((s) => s.context)
   const restored = useEmployeeSessionStore((s) => s.restored)
-  const continueAsAdmin = useOperatorChoiceStore((s) => s.continueAsAdmin)
-  const [showPinPad, setShowPinPad] = useState(false)
+  const bootstrapping = useBootstrapStore((s) => s.bootstrapping)
+  const setBootstrapping = useBootstrapStore((s) => s.setBootstrapping)
 
-  const { role: deviceRole } = useActiveBusiness()
-  const { data: employees, isLoading: employeesLoading } = useTerminalEmployees()
+  const { data: members, isLoading: membersLoading } = useTerminalEmployees()
 
-  // Auto-lock only matters while a PIN session is actually active.
   useAutoLock(!!context && context.status === 'active')
 
-  // A stored token still resolving — don't flash the lock screen.
+  // A stored token still resolving — don't flash the operator screen.
   if (token && !context && !restored) return <FullPageLoading />
 
-  if (context?.status === 'locked') return <LockScreen />
-
   if (context?.status === 'active') {
-    // A resolved operator governs. Cashiers get the Registry and nothing else.
+    // Cashiers get the Registry and nothing else.
     if (context.role === 'cashier') return <RegistryWorkspace />
     return <Outlet />
   }
 
-  // No operator session. The account holder chooses who is working: themselves,
-  // or an employee via PIN. Identity comes before any workspace loads.
-  const canManage = deviceRole === 'owner' || deviceRole === 'manager'
-  const hasPinEmployees = (employees ?? []).some((e) => e.has_pin)
+  // Locked session, or no session at all: the operator screen handles both.
+  if (context?.status === 'locked') return <OperatorSelectionScreen />
 
-  if (canManage && !continueAsAdmin && !employeesLoading && hasPinEmployees) {
-    if (showPinPad) return <LockScreen />
-    return <OperatorChoiceScreen onSwitchOperator={() => setShowPinPad(true)} />
-  }
+  if (membersLoading) return <FullPageLoading />
 
-  return <Outlet />
+  const anyPins = (members ?? []).some((m) => m.has_pin)
+
+  // Once PINs exist, bootstrap is over — everyone signs in as an operator.
+  if (anyPins && bootstrapping) setBootstrapping(false)
+
+  if (!anyPins && bootstrapping) return <Outlet />
+
+  return <OperatorSelectionScreen onBootstrap={() => setBootstrapping(true)} />
 }
 
 /**
- * Route guard for the management app. Cashiers who reach a management URL — by
- * typing it or by a stale link — are sent to their workspace rather than shown
- * a half-broken screen.
+ * Guard for management surfaces. The operator's role is authoritative; the
+ * device account's role only applies during bootstrap, when no operator session
+ * exists yet. Hiding is UX — 0012's RLS and RPC checks are the real boundary.
  */
 export function RequireManagementAccess({ roles }: { roles?: MemberRole[] }) {
   const context = useEmployeeSessionStore((s) => s.context)
+  const bootstrapping = useBootstrapStore((s) => s.bootstrapping)
   const { role: deviceRole, isLoading } = useActiveBusiness()
 
-  // The PIN actor wins when one is present.
-  const effectiveRole = context?.status === 'active' ? context.role : deviceRole
+  const effectiveRole = context?.status === 'active' ? context.role : bootstrapping ? deviceRole : undefined
 
   if (isLoading && !effectiveRole) return <FullPageLoading />
   if (effectiveRole === 'cashier') return <Navigate to="/registry" replace />
@@ -82,7 +96,7 @@ export function RequireManagementAccess({ roles }: { roles?: MemberRole[] }) {
   return <Outlet />
 }
 
-/** Standalone route so a cashier can be sent somewhere real. */
+/** Standalone Registry route, so a cashier always has somewhere real to land. */
 export function RegistryRoute() {
   useRestoreSession()
   const context = useEmployeeSessionStore((s) => s.context)
@@ -92,6 +106,6 @@ export function RegistryRoute() {
   useAutoLock(!!context && context.status === 'active')
 
   if (token && !context && !restored) return <FullPageLoading />
-  if (!context || context.status !== 'active') return <LockScreen />
+  if (!context || context.status !== 'active') return <OperatorSelectionScreen />
   return <RegistryWorkspace />
 }
