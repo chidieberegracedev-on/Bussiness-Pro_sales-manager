@@ -4,10 +4,15 @@ import { PageHeader } from '@/components/layout/page-header'
 import { useActiveBusiness } from '@/features/business/hooks'
 import type { MemberRole } from '@/types/database'
 
+const ALL_ROLES: MemberRole[] = ['owner', 'manager', 'inventory_staff', 'cashier']
+
 const TABS: { to: string; label: string; roles: MemberRole[] }[] = [
   { to: '/settings/business', label: 'Business', roles: ['owner', 'manager'] },
   { to: '/settings/categories', label: 'Categories', roles: ['owner', 'manager'] },
-  { to: '/settings/appearance', label: 'Appearance', roles: ['owner', 'manager', 'cashier'] },
+  { to: '/settings/employees', label: 'Employees', roles: ['owner', 'manager'] },
+  { to: '/settings/terminals', label: 'Terminals', roles: ['owner', 'manager'] },
+  { to: '/settings/permissions', label: 'Permissions', roles: ['owner', 'manager'] },
+  { to: '/settings/appearance', label: 'Appearance', roles: ALL_ROLES },
 ]
 
 export function SettingsLayout() {

@@ -6,7 +6,17 @@
 // than generated — embedded-resource selects are still cast explicitly at
 // each call site rather than relying on inferred join types.
 
-export type MemberRole = 'owner' | 'manager' | 'cashier'
+export type MemberRole = 'owner' | 'manager' | 'inventory_staff' | 'cashier'
+export type SessionStatus = 'active' | 'locked' | 'ended'
+export type ActivitySeverity = 'info' | 'notice' | 'exception'
+export type AuthorizedAction =
+  | 'discount'
+  | 'refund'
+  | 'petty_cash'
+  | 'inventory_adjustment'
+  | 'safe_drop'
+  | 'void'
+export type HeldBasketStatus = 'held' | 'resumed' | 'discarded'
 export type MemberStatus = 'active' | 'invited' | 'suspended'
 export type StockMovementType =
   | 'initial'
@@ -644,6 +654,102 @@ export interface Database {
         Update: Partial<Database['public']['Tables']['calculator_history']['Row']>
         Relationships: []
       }
+      terminals: {
+        Row: {
+          id: string
+          business_id: string
+          location_id: string
+          device_name: string
+          device_type: string
+          is_active: boolean
+          last_active_at: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['terminals']['Row']> & {
+          business_id: string
+          location_id: string
+          device_name: string
+        }
+        Update: Partial<Database['public']['Tables']['terminals']['Row']>
+        Relationships: []
+      }
+      employee_sessions: {
+        Row: {
+          id: string
+          business_id: string
+          member_id: string
+          terminal_id: string
+          token: string
+          status: SessionStatus
+          opened_at: string
+          last_seen_at: string
+          ended_at: string | null
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      permission_limits: {
+        Row: {
+          id: string
+          business_id: string
+          role: MemberRole
+          action: AuthorizedAction
+          max_amount: string | null
+          max_percent: string | null
+          max_quantity: string | null
+          allowed: boolean
+          updated_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['permission_limits']['Row']> & {
+          business_id: string
+          role: MemberRole
+          action: AuthorizedAction
+        }
+        Update: Partial<Database['public']['Tables']['permission_limits']['Row']>
+        Relationships: []
+      }
+      activity_events: {
+        Row: {
+          id: string
+          business_id: string
+          occurred_at: string
+          action_type: string
+          severity: ActivitySeverity
+          initiated_by: string | null
+          authorized_by: string | null
+          terminal_id: string | null
+          shift_id: string | null
+          reference_type: string | null
+          reference_id: string | null
+          detail: Record<string, unknown>
+          created_at: string
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      held_baskets: {
+        Row: {
+          id: string
+          business_id: string
+          terminal_id: string | null
+          shift_id: string | null
+          member_id: string | null
+          label: string | null
+          basket: unknown
+          item_count: number
+          total: string
+          status: HeldBasketStatus
+          created_at: string
+          updated_at: string
+          resumed_at: string | null
+        }
+        Insert: Partial<Database['public']['Tables']['held_baskets']['Row']> & { business_id: string }
+        Update: Partial<Database['public']['Tables']['held_baskets']['Row']>
+        Relationships: []
+      }
     }
     Views: {
       v_variant_stock: {
@@ -763,6 +869,65 @@ export interface Database {
           reference_id: string | null
           shift_id: string | null
           note: string | null
+        }
+        Relationships: []
+      }
+      v_activity_feed: {
+        Row: {
+          id: string
+          business_id: string
+          occurred_at: string
+          action_type: string
+          severity: ActivitySeverity
+          initiated_by: string | null
+          initiated_by_name: string | null
+          initiated_by_role: MemberRole | null
+          authorized_by: string | null
+          authorized_by_name: string | null
+          terminal_id: string | null
+          terminal_name: string | null
+          shift_id: string | null
+          reference_type: string | null
+          reference_id: string | null
+          detail: Record<string, unknown>
+        }
+        Relationships: []
+      }
+      v_live_shifts: {
+        Row: {
+          id: string
+          business_id: string
+          location_id: string
+          terminal_id: string | null
+          terminal_name: string | null
+          opened_by: string | null
+          opened_by_name: string | null
+          opened_by_role: MemberRole | null
+          opened_at: string
+          opening_float: string
+          drawer_cash: string
+          exception_count: string
+        }
+        Relationships: []
+      }
+      v_shift_discrepancies: {
+        Row: {
+          id: string
+          business_id: string
+          terminal_id: string | null
+          terminal_name: string | null
+          opened_by: string | null
+          opened_by_name: string | null
+          opened_at: string
+          closed_at: string | null
+          opening_float: string
+          counted_cash: string | null
+          expected_cash: string | null
+          variance: string | null
+          note: string | null
+          void_count: string
+          override_count: string
+          exception_count: string
         }
         Relationships: []
       }
@@ -965,8 +1130,115 @@ export interface Database {
         Args: { p_business_id: string }
         Returns: { type: InsightType; category: InsightCategory; text: string }[]
       }
+      set_employee_pin: {
+        Args: { p_business_id: string; p_member_id: string; p_pin: string }
+        Returns: void
+      }
+      pin_unlock: {
+        Args: {
+          p_business_id: string
+          p_member_id: string
+          p_terminal_id: string
+          p_pin: string
+        }
+        Returns: { token: string; member_id: string; role: MemberRole }
+      }
+      pin_resume_session: {
+        Args: { p_token: string; p_pin: string }
+        Returns: SessionContext
+      }
+      session_context: {
+        Args: { p_token: string }
+        Returns: SessionContext | null
+      }
+      session_actor: {
+        Args: { p_token: string }
+        Returns: string | null
+      }
+      pin_lock_session: {
+        Args: { p_token: string }
+        Returns: void
+      }
+      end_session: {
+        Args: { p_token: string }
+        Returns: void
+      }
+      authorize: {
+        Args: {
+          p_business_id: string
+          p_action: AuthorizedAction
+          p_actor_token: string
+          p_amount?: number | null
+          p_percent?: number | null
+          p_quantity?: number | null
+          p_terminal_id?: string | null
+          p_shift_id?: string | null
+          p_approver_member_id?: string | null
+          p_approver_pin?: string | null
+        }
+        Returns: AuthorizationGrant
+      }
+      seed_permission_limits: {
+        Args: { p_business_id: string }
+        Returns: void
+      }
+      seed_inventory_staff_limits: {
+        Args: { p_business_id: string }
+        Returns: void
+      }
+      record_activity: {
+        Args: {
+          p_business_id: string
+          p_action_type: string
+          p_initiated_by?: string | null
+          p_authorized_by?: string | null
+          p_terminal_id?: string | null
+          p_shift_id?: string | null
+          p_reference_type?: string | null
+          p_reference_id?: string | null
+          p_severity?: ActivitySeverity
+          p_detail?: unknown
+        }
+        Returns: string
+      }
+      record_activity_as_actor: {
+        Args: {
+          p_business_id: string
+          p_action_type: string
+          p_actor_token: string | null
+          p_authorized_by?: string | null
+          p_terminal_id?: string | null
+          p_shift_id?: string | null
+          p_reference_type?: string | null
+          p_reference_id?: string | null
+          p_severity?: ActivitySeverity
+          p_detail?: unknown
+        }
+        Returns: string
+      }
     }
   }
+}
+
+/** Resolved server-side from a session token — never assembled on the client. */
+export interface SessionContext {
+  member_id: string
+  business_id: string
+  terminal_id: string
+  terminal_name: string | null
+  role: MemberRole
+  display_name: string | null
+  status: SessionStatus
+  opened_at: string
+  last_seen_at: string
+}
+
+export interface AuthorizationGrant {
+  granted: boolean
+  requires_authorization?: boolean
+  initiated_by: string
+  authorized_by?: string
+  reason?: string
 }
 
 type JsonB = Record<string, unknown>

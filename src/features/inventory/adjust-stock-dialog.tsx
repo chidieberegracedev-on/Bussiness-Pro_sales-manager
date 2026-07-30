@@ -21,6 +21,11 @@ import { Label } from '@/components/ui/label'
 import { QuantityInput } from '@/components/quantity/quantity-input'
 import { Quantity } from '@/components/quantity/quantity'
 import { toast } from '@/hooks/use-toast'
+import { useActiveBusiness } from '@/features/business/hooks'
+import { useAuthorizationGate } from '@/features/control/use-authorization'
+import { ManagerPinModal } from '@/features/control/manager-pin-modal'
+import { useEmployeeSessionStore } from '@/features/control/session-store'
+import { recordActorActivity } from '@/features/control/activity'
 
 const REASONS = [
   { value: 'miscount', label: 'Miscount', movementType: 'adjustment' as const },
@@ -51,6 +56,10 @@ function AdjustStockForm({ context, onDone }: { context: StockDialogContext; onD
   const [movementId] = useState(() => crypto.randomUUID())
   const [serverError, setServerError] = useState<string | null>(null)
   const online = useOnlineStatus()
+  const { business } = useActiveBusiness()
+  const gate = useAuthorizationGate()
+  const sessionContext = useEmployeeSessionStore((s) => s.context)
+  const hasSession = sessionContext?.status === 'active'
 
   const form = useForm<FormValues>({
     resolver: zodResolver(schema),
@@ -90,6 +99,18 @@ function AdjustStockForm({ context, onDone }: { context: StockDialogContext; onD
 
     const reasonConfig = REASONS.find((r) => r.value === values.reason)
 
+    // Adjusting stock is a restricted action: within the operator's limit it
+    // self-authorizes, above it a manager PIN is required (BR-C4.6). With no PIN
+    // session the device account is acting directly and the gate is skipped.
+    let authorizedBy: string | null = null
+    if (hasSession) {
+      const grant = await gate.request('inventory_adjustment', {
+        quantity: calc.delta.abs().toString(),
+      })
+      if (!grant?.granted) return
+      authorizedBy = grant.authorized_by ?? null
+    }
+
     const { error } = await supabase.rpc('record_stock_movement', {
       p_movement_id: movementId,
       p_variant_id: values.variantId,
@@ -103,6 +124,22 @@ function AdjustStockForm({ context, onDone }: { context: StockDialogContext; onD
     if (error) {
       setServerError(toReadableError(error))
       return
+    }
+
+    if (business) {
+      await recordActorActivity({
+        businessId: business.id,
+        actionType: 'inventory_adjusted',
+        authorizedBy,
+        terminalId: sessionContext?.terminal_id ?? null,
+        referenceType: 'variant',
+        referenceId: values.variantId,
+        severity: authorizedBy && authorizedBy !== sessionContext?.member_id ? 'notice' : 'info',
+        detail: {
+          quantity: calc.delta.toString(),
+          reason: reasonConfig?.label ?? 'Adjustment',
+        },
+      })
     }
 
     invalidateInventoryQueries(queryClient, context.productId)
@@ -215,6 +252,8 @@ function AdjustStockForm({ context, onDone }: { context: StockDialogContext; onD
           Save adjustment
         </Button>
       </DialogFooter>
+
+      {gate.pending && <ManagerPinModal pending={gate.pending} onResolve={gate.resolvePending} />}
     </form>
   )
 }

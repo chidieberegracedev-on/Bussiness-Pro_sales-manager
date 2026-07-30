@@ -43,9 +43,23 @@ import { CloseShiftPage } from '@/features/finance/close-shift-page'
 import { DictionaryPage } from '@/features/help/dictionary-page'
 import { CalculatorPage } from '@/features/help/calculator-page'
 import { LearningCenterPage } from '@/features/help/learning-page'
+import { SettingsTerminalsPage } from '@/features/control/settings-terminals'
+import { SettingsEmployeesPage } from '@/features/control/settings-employees'
+import { SettingsPermissionsPage } from '@/features/control/settings-permissions'
+import { LiveShiftsPage } from '@/features/control/live-shifts-page'
+import { ShiftDiscrepanciesPage } from '@/features/control/discrepancies-page'
+import { ActivityLogPage } from '@/features/control/activity-page'
+import { ExceptionsPage } from '@/features/control/exceptions-page'
+import {
+  WorkspaceGate,
+  RequireManagementAccess,
+  RegistryRoute,
+} from '@/features/control/workspace-router'
 import { NotFoundPage } from '@/features/misc/not-found'
 
 const MANAGE_ROLES = ['owner', 'manager'] as const
+// Inventory staff work the backroom catalog and purchasing alongside management.
+const BACKROOM_ROLES = ['owner', 'manager', 'inventory_staff'] as const
 
 export function AppRouter() {
   return (
@@ -62,6 +76,12 @@ export function AppRouter() {
         <Route path="/select-business" element={<SelectBusinessPage />} />
 
         <Route element={<RequireBusiness />}>
+          {/* The Registry is its own full-screen workspace — no management shell. */}
+          <Route path="/registry" element={<RegistryRoute />} />
+
+          {/* Everything below is the management workspace. WorkspaceGate sends a
+              PIN-unlocked cashier to the Registry instead. */}
+          <Route element={<WorkspaceGate />}>
           <Route element={<AppShell />}>
             <Route index element={<Navigate to="/dashboard" replace />} />
 
@@ -73,7 +93,7 @@ export function AppRouter() {
             <Route path="/products" element={<ProductListPage />} />
             <Route path="/products/:id" element={<ProductDetailPage />} />
 
-            <Route element={<RequireRole roles={[...MANAGE_ROLES]} />}>
+            <Route element={<RequireRole roles={[...BACKROOM_ROLES]} />}>
               <Route path="/products/new" element={<CreateProductPage />} />
               <Route path="/products/:id/edit" element={<EditProductPage />} />
               <Route path="/inventory/movements" element={<MovementHistoryPage />} />
@@ -96,7 +116,7 @@ export function AppRouter() {
             <Route path="/purchase-orders" element={<PurchaseOrdersListPage />} />
             <Route path="/purchase-orders/:id" element={<PurchaseOrderDetailPage />} />
             <Route path="/purchase-orders/:id/receive" element={<ReceiveGoodsPage />} />
-            <Route element={<RequireRole roles={[...MANAGE_ROLES]} />}>
+            <Route element={<RequireRole roles={[...BACKROOM_ROLES]} />}>
               <Route path="/purchase-orders/new" element={<CreatePurchaseOrderPage />} />
               <Route path="/restock" element={<RestockPage />} />
             </Route>
@@ -114,6 +134,15 @@ export function AppRouter() {
               <Route path="/expenses/categories" element={<ExpenseCategoriesPage />} />
             </Route>
 
+            {/* Operational control — management only, enforced again server-side. */}
+            <Route element={<RequireManagementAccess roles={[...MANAGE_ROLES]} />}>
+              <Route path="/control" element={<Navigate to="/control/live-shifts" replace />} />
+              <Route path="/control/live-shifts" element={<LiveShiftsPage />} />
+              <Route path="/control/reconciliation" element={<ShiftDiscrepanciesPage />} />
+              <Route path="/control/activity" element={<ActivityLogPage />} />
+              <Route path="/control/exceptions" element={<ExceptionsPage />} />
+            </Route>
+
             <Route path="/help" element={<Navigate to="/help/learning" replace />} />
             <Route path="/help/learning" element={<LearningCenterPage />} />
             <Route path="/help/dictionary" element={<DictionaryPage />} />
@@ -125,8 +154,12 @@ export function AppRouter() {
               <Route element={<RequireRole roles={[...MANAGE_ROLES]} />}>
                 <Route path="business" element={<SettingsBusinessPage />} />
                 <Route path="categories" element={<SettingsCategoriesPage />} />
+                <Route path="employees" element={<SettingsEmployeesPage />} />
+                <Route path="terminals" element={<SettingsTerminalsPage />} />
+                <Route path="permissions" element={<SettingsPermissionsPage />} />
               </Route>
             </Route>
+          </Route>
           </Route>
         </Route>
       </Route>

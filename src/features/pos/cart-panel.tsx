@@ -7,11 +7,25 @@ import { Money } from '@/components/money/money'
 import { Quantity } from '@/components/quantity/quantity'
 import { EmptyState } from '@/components/data/empty-state'
 
-export function CartPanel({ onTakePayment }: { onTakePayment: () => void }) {
+export function CartPanel({
+  onTakePayment,
+  onRemoveLine,
+  onClear,
+}: {
+  onTakePayment: () => void
+  /**
+   * Supplied by the Registry Workspace so a removal routes through the
+   * authorization gate. Falls back to a direct removal in the management POS,
+   * where the operator is already the account holder.
+   */
+  onRemoveLine?: (variantId: string) => void
+  onClear?: () => void
+}) {
   const lines = useCartStore((s) => s.lines)
   const setQuantity = useCartStore((s) => s.setQuantity)
   const removeLine = useCartStore((s) => s.removeLine)
   const subtotal = cartSubtotal(lines)
+  const handleRemove = onRemoveLine ?? removeLine
 
   return (
     <div className="flex h-full flex-col">
@@ -83,7 +97,7 @@ export function CartPanel({ onTakePayment }: { onTakePayment: () => void }) {
                       variant="ghost"
                       size="icon"
                       className="size-7"
-                      onClick={() => removeLine(line.variantId)}
+                      onClick={() => handleRemove(line.variantId)}
                       aria-label={`Remove ${line.productName} from cart`}
                     >
                       <Trash2 className="size-3.5 text-danger" />
@@ -111,6 +125,11 @@ export function CartPanel({ onTakePayment }: { onTakePayment: () => void }) {
           <Button className="w-full" size="lg" onClick={onTakePayment}>
             Take payment
           </Button>
+          {onClear && (
+            <Button variant="ghost" size="sm" className="w-full text-danger" onClick={onClear}>
+              Clear basket
+            </Button>
+          )}
         </div>
       )}
     </div>

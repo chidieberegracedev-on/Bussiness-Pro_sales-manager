@@ -1,6 +1,6 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
-import { ArrowLeft, Loader2, Clock, MapPin, Info } from 'lucide-react'
+import { useNavigate, useSearchParams } from 'react-router-dom'
+import { ArrowLeft, Loader2, Clock, MapPin, Info, ArrowRightLeft } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { MoneyInput } from '@/components/money/money-input'
@@ -16,7 +16,10 @@ export function OpenShiftPage() {
   const { data: existing } = useOpenShift(location?.id)
   const openMutation = useOpenShiftMutation()
 
-  const [openingFloat, setOpeningFloat] = useState('')
+  const [searchParams] = useSearchParams()
+  // A handover arrives with the previous shift's counted cash pre-filled.
+  const handoverFloat = searchParams.get('float')
+  const [openingFloat, setOpeningFloat] = useState(handoverFloat ?? '')
 
   async function handleOpen() {
     if (!location) return
@@ -72,10 +75,17 @@ export function OpenShiftPage() {
               autoFocus
               disabled={!!existing}
             />
-            <p className="mt-1.5 flex items-start gap-1 text-xs text-text-muted">
-              <Info className="mt-0.5 size-3 shrink-0" />
-              The cash you're starting the drawer with. Enter 0 if you're starting empty.
-            </p>
+            {handoverFloat ? (
+              <p className="mt-1.5 flex items-start gap-1 text-xs text-accent-primary">
+                <ArrowRightLeft className="mt-0.5 size-3 shrink-0" />
+                Carried over from the shift just closed. Check the drawer and adjust if it differs.
+              </p>
+            ) : (
+              <p className="mt-1.5 flex items-start gap-1 text-xs text-text-muted">
+                <Info className="mt-0.5 size-3 shrink-0" />
+                The cash you're starting the drawer with. Enter 0 if you're starting empty.
+              </p>
+            )}
           </div>
         </CardContent>
         <CardFooter className="justify-end gap-2">

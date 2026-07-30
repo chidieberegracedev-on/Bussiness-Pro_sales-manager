@@ -22,6 +22,8 @@ interface CartState {
   addLine: (item: { variantId: string; productName: string; variantName: string | null; baseUnit: string; unitPrice: Decimal }) => void
   removeLine: (variantId: string) => void
   setQuantity: (variantId: string, quantity: Decimal) => void
+  /** Replaces the basket wholesale — used when resuming a held basket. */
+  setLines: (lines: CartLine[]) => void
   reset: () => void
 }
 
@@ -68,6 +70,10 @@ export const useCartStore = create<CartState>((set, get) => ({
       lines: get().lines.map((l) => (l.variantId === variantId ? { ...l, quantity } : l)),
     })
   },
+
+  // A resumed basket becomes a fresh sale attempt: mint a new saleId so it
+  // cannot collide with the idempotency key of the sale it was parked from.
+  setLines: (lines) => set({ saleId: crypto.randomUUID(), lines, addedCount: 0 }),
 
   reset: () => set({ saleId: crypto.randomUUID(), lines: [], addedCount: 0 }),
 }))

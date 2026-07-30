@@ -6,18 +6,26 @@ import { useSidebarStore } from '@/components/layout/sidebar-store'
 import { BusinessSwitcher } from '@/components/layout/business-switcher'
 import { UserMenu } from '@/components/layout/user-menu'
 import { useActiveBusiness } from '@/features/business/hooks'
+import { useEmployeeSessionStore } from '@/features/control/session-store'
 import { Button } from '@/components/ui/button'
 
 function SidebarContent({ collapsed, onNavigate }: { collapsed: boolean; onNavigate?: () => void }) {
-  const { role } = useActiveBusiness()
+  const { role: deviceRole } = useActiveBusiness()
+  const sessionContext = useEmployeeSessionStore((s) => s.context)
   const location = useLocation()
 
-  const items = NAV_ITEMS.map((item) => {
-    if (item.label === 'Settings' && role === 'cashier') {
-      return { ...item, to: '/settings/appearance' }
-    }
-    return item
-  })
+  // A PIN-unlocked operator's role governs what they see; without one the device
+  // account's role applies. Hiding is UX only — the server enforces the boundary.
+  const role = sessionContext?.status === 'active' ? sessionContext.role : deviceRole
+
+  const items = NAV_ITEMS.filter((item) => !item.roles || (role && item.roles.includes(role))).map(
+    (item) => {
+      if (item.label === 'Settings' && role !== 'owner' && role !== 'manager') {
+        return { ...item, to: '/settings/appearance' }
+      }
+      return item
+    },
+  )
 
   return (
     <div className="flex h-full flex-col gap-4 p-3">

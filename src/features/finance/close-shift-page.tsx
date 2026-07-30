@@ -144,7 +144,31 @@ export function CloseShiftPage() {
             </>
           )}
 
-          {mode === 'closed' && <ClosedShiftResult shift={shift} />}
+              {mode === 'closed' && (
+            <>
+              <ClosedShiftResult shift={shift} />
+              {/* Handover: the counted cash becomes the next operator's float,
+                  so accountability separates cleanly at the changeover
+                  (BR-C3.6). */}
+              <div className="mt-4 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-accent-primary/30 bg-accent-primary/5 p-3">
+                <div>
+                  <p className="text-sm font-medium text-text-primary">Handing over to someone?</p>
+                  <p className="mt-0.5 text-xs text-text-secondary">
+                    Their opening float starts at the{' '}
+                    <Money value={shift.counted_cash ?? '0'} /> you just counted.
+                  </p>
+                </div>
+                <Button
+                  size="sm"
+                  onClick={() =>
+                    navigate(`/shifts/open?float=${encodeURIComponent(shift.counted_cash ?? '0')}`)
+                  }
+                >
+                  Start next shift <ArrowRight className="size-4" />
+                </Button>
+              </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
