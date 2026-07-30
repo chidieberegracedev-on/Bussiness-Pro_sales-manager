@@ -4,6 +4,7 @@ import { TopBar } from '@/components/layout/top-bar'
 import { OfflineBanner } from '@/components/layout/offline-banner'
 import { AddStockDialog } from '@/features/inventory/add-stock-dialog'
 import { AdjustStockDialog } from '@/features/inventory/adjust-stock-dialog'
+import { FloatingCalculator } from '@/features/help/floating-calculator'
 
 export function AppShell() {
   return (
@@ -18,6 +19,7 @@ export function AppShell() {
       </div>
       <AddStockDialog />
       <AdjustStockDialog />
+      <FloatingCalculator />
     </div>
   )
 }

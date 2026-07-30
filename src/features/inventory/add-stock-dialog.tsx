@@ -21,6 +21,7 @@ import { MoneyInput } from '@/components/money/money-input'
 import { QuantityInput } from '@/components/quantity/quantity-input'
 import { Money } from '@/components/money/money'
 import { Quantity } from '@/components/quantity/quantity'
+import { Term } from '@/features/help/term'
 import { toast } from '@/hooks/use-toast'
 
 const schema = z.object({
@@ -187,7 +188,7 @@ function AddStockForm({ context, onDone }: { context: StockDialogContext; onDone
             Stock: <Quantity value={preview.qtyBefore} /> → <span className="font-medium text-text-primary"><Quantity value={preview.qtyAfter} /></span>
           </p>
           <p className="text-text-secondary">
-            Average cost: <Money value={preview.avgBefore} /> → <span className="font-medium text-text-primary"><Money value={preview.avgAfter} /></span>
+            <Term slug="average-cost">Average cost</Term>: <Money value={preview.avgBefore} /> → <span className="font-medium text-text-primary"><Money value={preview.avgAfter} /></span>
           </p>
         </div>
       )}

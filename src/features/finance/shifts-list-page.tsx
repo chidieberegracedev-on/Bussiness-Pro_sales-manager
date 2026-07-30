@@ -10,6 +10,7 @@ import { EmptyState } from '@/components/data/empty-state'
 import { ErrorState } from '@/components/data/error-state'
 import { Money } from '@/components/money/money'
 import { useShifts, useOpenShift } from '@/features/finance/use-shifts'
+import { Term } from '@/features/help/term'
 import { useActiveBusiness, useDefaultLocation } from '@/features/business/hooks'
 import { useLocale } from '@/features/auth/use-locale'
 import { formatDateTime } from '@/lib/format'
@@ -60,8 +61,8 @@ export function ShiftsListPage() {
               <p className="text-sm font-medium text-text-primary">A shift is open</p>
               <p className="text-xs text-text-muted">
                 Opened{' '}
-                {business ? formatDateTime(openShift.opened_at, business.timezone, locale) : openShift.opened_at} ·
-                float <Money value={openShift.opening_float} />
+                {business ? formatDateTime(openShift.opened_at, business.timezone, locale) : openShift.opened_at} ·{' '}
+                <Term slug="float">float</Term> <Money value={openShift.opening_float} />
               </p>
             </div>
             <Button size="sm" onClick={() => navigate(`/shifts/${openShift.id}/close`)}>

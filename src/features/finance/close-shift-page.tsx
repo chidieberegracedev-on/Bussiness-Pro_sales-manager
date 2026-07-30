@@ -25,6 +25,7 @@ import { formatDateTime } from '@/lib/format'
 import { toast } from '@/hooks/use-toast'
 import { toReadableError } from '@/lib/errors'
 import { TransferCashDialog } from '@/features/finance/transfer-cash-dialog'
+import { Term } from '@/features/help/term'
 import type { CashShift } from '@/features/finance/use-shifts'
 
 type Mode = 'live' | 'counting' | 'closed'
@@ -113,7 +114,10 @@ export function CloseShiftPage() {
         </CardHeader>
         <CardContent className="space-y-4">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
-            <MetaItem label="Opening float" value={<Money value={shift.opening_float} />} />
+            <MetaItem
+              label={<Term slug="float">Opening float</Term>}
+              value={<Money value={shift.opening_float} />}
+            />
             {mode === 'closed' && (
               <>
                 <MetaItem label="Counted" value={<Money value={shift.counted_cash ?? '0'} />} />
@@ -156,7 +160,9 @@ export function CloseShiftPage() {
               onClick={() => setTransferOpen({ from: 'cash', to: 'safe' })}
             >
               <Vault className="size-5" />
-              <span className="text-sm">Drop to safe</span>
+              <span className="text-sm">
+                <Term slug="safe-drop">Drop to safe</Term>
+              </span>
             </Button>
             <Button
               variant="outline"
@@ -180,7 +186,7 @@ export function CloseShiftPage() {
   )
 }
 
-function MetaItem({ label, value }: { label: string; value: React.ReactNode }) {
+function MetaItem({ label, value }: { label: React.ReactNode; value: React.ReactNode }) {
   return (
     <div className="rounded-md border border-border bg-surface-muted/40 p-3">
       <p className="text-xs text-text-muted">{label}</p>

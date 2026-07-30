@@ -14,6 +14,7 @@ import { useActiveBusiness } from '@/features/business/hooks'
 import { businessDayStartUtc } from '@/lib/format'
 import { useSalesList, useSalesTotals, type SalesListFilters } from '@/features/sales/use-sales-list'
 import { SalesTable } from '@/features/sales/sales-table'
+import { Term } from '@/features/help/term'
 
 const PAGE_SIZE = 50
 
@@ -130,7 +131,9 @@ export function SalesListPage() {
               </div>
               {canSeeGrossProfit && (
                 <div>
-                  <p className="text-text-secondary">Gross profit</p>
+                  <p className="text-text-secondary">
+                    <Term slug="gross-profit">Gross profit</Term>
+                  </p>
                   <p className="font-semibold text-text-primary">
                     <Money value={totals.grossProfit} />
                   </p>

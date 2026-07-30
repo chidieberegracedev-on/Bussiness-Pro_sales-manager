@@ -5,7 +5,7 @@ import Decimal from 'decimal.js'
 import { cn } from '@/lib/utils'
 
 interface StatCardProps {
-  label: string
+  label: ReactNode
   value: ReactNode
   icon: LucideIcon
   iconColor?: string

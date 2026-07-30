@@ -40,6 +40,9 @@ import { ExpenseCategoriesPage } from '@/features/finance/expense-categories-pag
 import { ShiftsListPage } from '@/features/finance/shifts-list-page'
 import { OpenShiftPage } from '@/features/finance/open-shift-page'
 import { CloseShiftPage } from '@/features/finance/close-shift-page'
+import { DictionaryPage } from '@/features/help/dictionary-page'
+import { CalculatorPage } from '@/features/help/calculator-page'
+import { LearningCenterPage } from '@/features/help/learning-page'
 import { NotFoundPage } from '@/features/misc/not-found'
 
 const MANAGE_ROLES = ['owner', 'manager'] as const
@@ -110,6 +113,11 @@ export function AppRouter() {
               <Route path="/finance/cashbook" element={<CashbookPage />} />
               <Route path="/expenses/categories" element={<ExpenseCategoriesPage />} />
             </Route>
+
+            <Route path="/help" element={<Navigate to="/help/learning" replace />} />
+            <Route path="/help/learning" element={<LearningCenterPage />} />
+            <Route path="/help/dictionary" element={<DictionaryPage />} />
+            <Route path="/help/calculator" element={<CalculatorPage />} />
 
             <Route path="/settings" element={<SettingsLayout />}>
               <Route index element={<SettingsIndexRedirect />} />

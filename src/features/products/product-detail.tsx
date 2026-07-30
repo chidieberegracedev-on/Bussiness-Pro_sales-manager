@@ -20,6 +20,7 @@ import { DetailSkeleton } from '@/components/data/loading-state'
 import { ErrorState } from '@/components/data/error-state'
 import { EmptyState } from '@/components/data/empty-state'
 import { MovementsTable } from '@/features/inventory/movements-table'
+import { Term } from '@/features/help/term'
 import { toast } from '@/hooks/use-toast'
 
 export function ProductDetailPage() {
@@ -119,11 +120,15 @@ export function ProductDetailPage() {
               <div className="mt-1"><StockStatusBadge status={variants[0].stock_status} /></div>
             </div>
             <div>
-              <p className="text-xs font-medium uppercase text-text-muted">Average cost</p>
+              <p className="text-xs font-medium uppercase text-text-muted">
+                <Term slug="average-cost">Average cost</Term>
+              </p>
               <p className="mt-1 text-lg font-semibold"><Money value={variants[0].avg_cost} /></p>
             </div>
             <div>
-              <p className="text-xs font-medium uppercase text-text-muted">Stock value</p>
+              <p className="text-xs font-medium uppercase text-text-muted">
+                <Term slug="stock-value">Stock value</Term>
+              </p>
               <p className="mt-1 text-lg font-semibold"><Money value={variants[0].stock_value} /></p>
             </div>
           </CardContent>

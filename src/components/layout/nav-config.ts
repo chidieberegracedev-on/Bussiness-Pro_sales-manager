@@ -18,6 +18,10 @@ import {
   Clock,
   BookOpen,
   DollarSign,
+  GraduationCap,
+  BookA,
+  Calculator,
+  Compass,
 } from 'lucide-react'
 import type { MemberRole } from '@/types/database'
 
@@ -73,6 +77,16 @@ export const NAV_ITEMS: NavItem[] = [
       { label: 'Sales Report', to: '/reports/sales', icon: Receipt },
       { label: 'Product Performance', to: '/reports/products', icon: TrendingUp },
       { label: 'Inventory Intelligence', to: '/reports/inventory', icon: Warehouse },
+    ],
+  },
+  {
+    label: 'Help & Learning',
+    to: '/help/learning',
+    icon: GraduationCap,
+    children: [
+      { label: 'Learning Center', to: '/help/learning', icon: Compass },
+      { label: 'Dictionary', to: '/help/dictionary', icon: BookA },
+      { label: 'Calculator', to: '/help/calculator', icon: Calculator },
     ],
   },
   { label: 'Settings', to: '/settings/business', icon: Settings },

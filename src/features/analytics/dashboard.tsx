@@ -20,6 +20,8 @@ import { businessDayStartUtc } from '@/lib/format'
 import { Money } from '@/components/money/money'
 import { Quantity } from '@/components/quantity/quantity'
 import { StockStatusBadge } from '@/components/data/stock-status-badge'
+import { InsightsStrip } from '@/features/help/insights-strip'
+import { Term } from '@/features/help/term'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -157,6 +159,9 @@ export function DashboardPage() {
         </div>
       </div>
 
+      {/* Coaching insights — advisory, never blocking */}
+      <InsightsStrip />
+
       {/* Pulse KPI row */}
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         <StatCard
@@ -185,7 +190,7 @@ export function DashboardPage() {
         />
         {canSeeProfit && (
           <StatCard
-            label="Gross Profit"
+            label={<Term slug="gross-profit">Gross Profit</Term>}
             value={<Money value={profit} />}
             icon={TrendingUp}
             iconColor="text-accent-tertiary bg-accent-tertiary/10"

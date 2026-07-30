@@ -50,6 +50,9 @@ export type FinancialEventType =
   | 'adjustment'
 export type ShiftStatus = 'open' | 'closed'
 export type CashSource = 'cash' | 'bank' | 'petty_cash'
+export type CalculatorKind = 'standard' | 'margin' | 'markup' | 'discount' | 'unit' | 'profit'
+export type InsightType = 'positive' | 'attention'
+export type InsightCategory = 'sales' | 'expenses' | 'margin' | 'stock' | 'cash'
 
 export interface Database {
   public: {
@@ -612,6 +615,35 @@ export interface Database {
         Update: never
         Relationships: []
       }
+      business_dictionary: {
+        Row: {
+          id: string
+          term: string
+          slug: string
+          short_def: string
+          full_def: string
+          example: string | null
+          related: string[]
+          category: string | null
+          created_at: string
+        }
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      calculator_history: {
+        Row: {
+          id: string
+          user_id: string
+          kind: CalculatorKind
+          expression: string | null
+          result: string | null
+          created_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['calculator_history']['Row']> & { user_id: string }
+        Update: Partial<Database['public']['Tables']['calculator_history']['Row']>
+        Relationships: []
+      }
     }
     Views: {
       v_variant_stock: {
@@ -928,6 +960,10 @@ export interface Database {
           p_note?: string | null
         }
         Returns: void
+      }
+      business_insights: {
+        Args: { p_business_id: string }
+        Returns: { type: InsightType; category: InsightCategory; text: string }[]
       }
     }
   }

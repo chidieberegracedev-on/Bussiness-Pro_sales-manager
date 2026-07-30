@@ -6,6 +6,7 @@ import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/componen
 import { MoneyInput } from '@/components/money/money-input'
 import { useDefaultLocation } from '@/features/business/hooks'
 import { useOpenShift, useOpenShiftMutation } from '@/features/finance/use-shifts'
+import { Term } from '@/features/help/term'
 import { toast } from '@/hooks/use-toast'
 import { toReadableError } from '@/lib/errors'
 
@@ -60,7 +61,9 @@ export function OpenShiftPage() {
           </div>
 
           <div>
-            <label className="text-sm font-medium text-text-primary">Opening float</label>
+            <label className="text-sm font-medium text-text-primary">
+              Opening <Term slug="float">float</Term>
+            </label>
             <MoneyInput
               className="mt-1.5"
               value={openingFloat}

@@ -21,6 +21,7 @@ import { Skeleton } from '@/components/ui/skeleton'
 import { Money } from '@/components/money/money'
 import { ErrorState, PermissionDeniedState } from '@/components/data/error-state'
 import { useFinancialPosition, useCashbook } from '@/features/finance/use-financial-position'
+import { Term } from '@/features/help/term'
 import { useActiveBusiness } from '@/features/business/hooks'
 import { businessDayStartUtc } from '@/lib/format'
 import { cn } from '@/lib/utils'
@@ -97,7 +98,9 @@ export function FinanceDashboardPage() {
       <Card>
         <CardContent className="flex flex-wrap items-center justify-between gap-4 pt-6">
           <div>
-            <p className="text-sm text-text-secondary">Available cash across all accounts</p>
+            <p className="text-sm text-text-secondary">
+              <Term slug="available-cash">Available cash</Term> across all accounts
+            </p>
             <p className="mt-1 text-3xl font-bold tracking-tight text-text-primary">
               <Money value={availableCash} />
             </p>
@@ -106,7 +109,9 @@ export function FinanceDashboardPage() {
             </p>
           </div>
           <div className="text-right">
-            <p className="text-sm text-text-secondary">Net profit · this month</p>
+            <p className="text-sm text-text-secondary">
+              <Term slug="net-profit">Net profit</Term> · this month
+            </p>
             <p
               className={cn(
                 'mt-1 text-2xl font-bold',
@@ -149,7 +154,7 @@ export function FinanceDashboardPage() {
           onClick={() => navigate('/finance/cashbook?account=safe')}
         />
         <BalanceCard
-          label="Petty cash"
+          label={<Term slug="petty-cash">Petty cash</Term>}
           value={position.petty_cash}
           icon={PiggyBank}
           iconClass="text-accent-tertiary bg-accent-tertiary/10"
@@ -157,29 +162,29 @@ export function FinanceDashboardPage() {
         />
 
         <BalanceCard
-          label="Supplier payable"
+          label={<Term slug="supplier-credit">Supplier payable</Term>}
           value={position.supplier_payable}
           icon={Truck}
           iconClass="text-warning bg-warning/10"
-          onClick={() => navigate('/finance/supplier-payments')}
+          onClick={() => navigate('/finance/cashbook')}
           negative
         />
         <BalanceCard
-          label="Revenue (month)"
+          label={<Term slug="revenue">Revenue</Term>}
           value={monthPnl?.revenue ?? '0'}
           icon={DollarSign}
           iconClass="text-success bg-success/10"
           onClick={() => navigate('/reports/sales')}
         />
         <BalanceCard
-          label="Expenses (month)"
+          label={<Term slug="expense">Expenses</Term>}
           value={monthPnl?.expenses ?? '0'}
           icon={Receipt}
           iconClass="text-danger bg-danger/10"
           onClick={() => navigate('/expenses')}
         />
         <BalanceCard
-          label="Net profit (month)"
+          label={<Term slug="net-profit">Net profit</Term>}
           value={netProfitMonth.toString()}
           icon={TrendingUp}
           iconClass={
@@ -199,18 +204,30 @@ export function FinanceDashboardPage() {
         </CardHeader>
         <CardContent>
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-            <PnlLine label="Revenue" value={monthPnl?.revenue ?? '0'} accent="success" />
-            <PnlLine label="Cost of goods sold" value={monthPnl?.cogs ?? '0'} negative />
             <PnlLine
-              label="Gross profit"
+              label={<Term slug="revenue">Revenue</Term>}
+              value={monthPnl?.revenue ?? '0'}
+              accent="success"
+            />
+            <PnlLine
+              label={<Term slug="cogs">Cost of goods sold</Term>}
+              value={monthPnl?.cogs ?? '0'}
+              negative
+            />
+            <PnlLine
+              label={<Term slug="gross-profit">Gross profit</Term>}
               value={
                 monthPnl ? new Decimal(monthPnl.revenue).minus(monthPnl.cogs).toString() : '0'
               }
               accent="accent"
             />
-            <PnlLine label="Expenses" value={monthPnl?.expenses ?? '0'} negative />
             <PnlLine
-              label="Net profit"
+              label={<Term slug="expense">Expenses</Term>}
+              value={monthPnl?.expenses ?? '0'}
+              negative
+            />
+            <PnlLine
+              label={<Term slug="net-profit">Net profit</Term>}
               value={netProfitMonth.toString()}
               accent={netProfitMonth.gte(0) ? 'success' : 'danger'}
               bold
@@ -243,7 +260,7 @@ function BalanceCard({
   onClick,
   negative,
 }: {
-  label: string
+  label: React.ReactNode
   value: string
   icon: React.ComponentType<{ className?: string }>
   iconClass: string
@@ -278,7 +295,7 @@ function PnlLine({
   negative,
   bold,
 }: {
-  label: string
+  label: React.ReactNode
   value: string
   accent?: 'success' | 'danger' | 'accent'
   negative?: boolean

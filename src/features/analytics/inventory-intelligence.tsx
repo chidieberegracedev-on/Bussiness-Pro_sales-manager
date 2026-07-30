@@ -16,6 +16,7 @@ import { useActiveBusiness } from '@/features/business/hooks'
 import { useLocale } from '@/features/auth/use-locale'
 import { formatMoney } from '@/lib/money'
 import { StatCard } from '@/features/analytics/stat-card'
+import { Term } from '@/features/help/term'
 import { Money } from '@/components/money/money'
 import { Quantity } from '@/components/quantity/quantity'
 import { Button } from '@/components/ui/button'
@@ -91,7 +92,7 @@ export function InventoryIntelligencePage() {
           <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
             {canSeeValue && (
               <StatCard
-                label="Total Inventory Value"
+                label={<Term slug="inventory-valuation">Total Inventory Value</Term>}
                 value={inventoryValue ? <Money value={inventoryValue.total_cost_value} /> : '—'}
                 icon={Warehouse}
                 iconColor="text-accent-primary bg-accent-primary/10"
