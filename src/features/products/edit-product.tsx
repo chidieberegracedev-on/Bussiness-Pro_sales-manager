@@ -95,14 +95,14 @@ export function EditProductPage() {
       })
       setImagePath(product.image_path)
     }
-    // Include categories?.length so the Select re-picks the label once
-    // categories finish loading — otherwise the categoryId is set on the form
-    // but the matching SelectItem doesn't exist yet, and the user sees
-    // "No category" (Fix 009 §Issue 1).
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [product?.id, variants?.length, categories?.length])
+  }, [product?.id, variants?.length])
 
   const hasPurchaseUnit = form.watch('hasPurchaseUnit')
+
+  const selectedCategoryId = form.watch('categoryId')
+  const selectedCategoryLabel =
+    categories?.find((c) => c.id === selectedCategoryId)?.name ?? 'No category'
 
   async function handleImageSelect(file: File) {
     if (!business) return
@@ -181,10 +181,18 @@ export function EditProductPage() {
                 <div>
                   <label className="text-sm font-medium text-text-primary">Category</label>
                   <Select
-                    value={form.watch('categoryId') || 'none'}
+                    value={selectedCategoryId || 'none'}
                     onValueChange={(v) => form.setValue('categoryId', v === 'none' ? '' : v)}
                   >
-                    <SelectTrigger className="mt-1.5"><SelectValue placeholder="No category" /></SelectTrigger>
+                    <SelectTrigger className="mt-1.5">
+                      {/* Render the resolved name as children rather than letting
+                          SelectValue look it up from the items: the product query
+                          resolves before the categories query, so at the moment
+                          categoryId is set there is no matching SelectItem yet and
+                          Radix never re-resolves the label once they mount
+                          (Fix 009 §Issue 1). */}
+                      <SelectValue placeholder="No category">{selectedCategoryLabel}</SelectValue>
+                    </SelectTrigger>
                     <SelectContent>
                       <SelectItem value="none">No category</SelectItem>
                       {categories?.map((c) => (

@@ -198,7 +198,13 @@ export function CreatePurchaseOrderPage() {
               <label className="text-sm font-medium text-text-secondary">Supplier</label>
               <Select value={supplierId} onValueChange={setSupplierId} disabled={suppliersLoading}>
                 <SelectTrigger className="mt-1" aria-label="Supplier">
-                  <SelectValue placeholder="Choose a supplier…" />
+                  {/* Resolved name as children — a supplierId prefilled from
+                      ?supplier= is set before the suppliers list loads, and
+                      Radix won't re-resolve the label once the items mount
+                      (same defect as Fix 009 §Issue 1). */}
+                  <SelectValue placeholder="Choose a supplier…">
+                    {suppliers?.find((s) => s.id === supplierId)?.name}
+                  </SelectValue>
                 </SelectTrigger>
                 <SelectContent>
                   {(suppliers ?? []).map((s) => (
