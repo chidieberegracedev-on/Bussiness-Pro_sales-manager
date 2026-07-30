@@ -83,6 +83,7 @@ export interface EmployeeRow {
   status: string
   has_pin: boolean
   pin_locked_until: string | null
+  created_at: string
 }
 
 export function useEmployees() {
@@ -94,7 +95,7 @@ export function useEmployees() {
       const { data, error } = await supabase
         .from('business_members')
         .select(
-          'id, user_id, role, status, display_name, profiles(full_name), employee_pins(member_id, locked_until)',
+          'id, user_id, role, status, display_name, created_at, profiles(full_name), employee_pins(member_id, locked_until)',
         )
         .eq('business_id', business!.id)
         .order('created_at', { ascending: true })
@@ -105,6 +106,7 @@ export function useEmployees() {
         role: MemberRole
         status: string
         display_name: string | null
+        created_at: string
         profiles: { full_name: string | null } | null
         employee_pins: { member_id: string; locked_until: string | null }[] | null
       }
@@ -117,6 +119,7 @@ export function useEmployees() {
           status: m.status,
           has_pin: (m.employee_pins?.length ?? 0) > 0,
           pin_locked_until: m.employee_pins?.[0]?.locked_until ?? null,
+          created_at: m.created_at,
         }),
       )
     },

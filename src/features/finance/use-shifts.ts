@@ -2,6 +2,8 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import Decimal from 'decimal.js'
 import { supabase } from '@/lib/supabase'
 import { useActiveBusiness } from '@/features/business/hooks'
+import { readSessionContext, getTerminalId } from '@/features/control/session-store'
+import { recordActorActivity } from '@/features/control/activity'
 import type { Database } from '@/types/database'
 
 export type CashShift = Database['public']['Tables']['cash_shifts']['Row']
@@ -99,6 +101,17 @@ export function useOpenShiftMutation() {
 
   return useMutation({
     mutationFn: async (input: { locationId: string; openingFloat: string }) => {
+      // A shift belongs to an employee on a terminal. Without a resolved
+      // operator session there is nobody to hold it accountable, so refuse.
+      const ctx = readSessionContext()
+      const terminalId = getTerminalId()
+      if (!ctx || ctx.status !== 'active') {
+        throw new Error('Sign in with your PIN before opening a shift.')
+      }
+      if (!terminalId) {
+        throw new Error('This device is not registered as a terminal yet.')
+      }
+
       const shiftId = crypto.randomUUID()
       const floatDecimal = new Decimal(input.openingFloat || '0')
       const { data, error } = await supabase.rpc('open_shift', {
@@ -113,7 +126,28 @@ export function useOpenShiftMutation() {
         console.error('[open_shift] failed', { input, error })
         throw error
       }
-      return data as CashShift
+      const shift = data as CashShift
+
+      // open_shift stamps opened_by with auth.uid() — the device account, not
+      // the PIN operator — and cash_shifts has no client write policy for
+      // terminal_id. So the real operator and terminal are recorded on the
+      // activity ledger, where the actor is resolved from the session token
+      // server-side. Every shift view reads the operator from here.
+      await recordActorActivity({
+        businessId: business!.id,
+        actionType: 'shift_opened',
+        terminalId,
+        shiftId: shift.id,
+        referenceType: 'shift',
+        referenceId: shift.id,
+        detail: {
+          opening_float: floatDecimal.toString(),
+          operator: ctx.display_name ?? '',
+          terminal: ctx.terminal_name ?? '',
+        },
+      })
+
+      return shift
     },
     onSuccess: (_, variables) => {
       qc.invalidateQueries({ queryKey: ['shifts', business?.id] })
@@ -145,7 +179,26 @@ export function useCloseShiftMutation() {
         console.error('[close_shift] failed', { input, error })
         throw error
       }
-      return data as CashShift
+      const closed = data as CashShift
+
+      const ctx = readSessionContext()
+      await recordActorActivity({
+        businessId: business!.id,
+        actionType: 'shift_closed',
+        terminalId: ctx?.terminal_id ?? getTerminalId(),
+        shiftId: closed.id,
+        referenceType: 'shift',
+        referenceId: closed.id,
+        // A drawer that didn't balance is worth a human look, not an accusation.
+        severity: closed.variance && Number(closed.variance) !== 0 ? 'exception' : 'info',
+        detail: {
+          counted: closed.counted_cash ?? '',
+          expected: closed.expected_cash ?? '',
+          variance: closed.variance ?? '0',
+        },
+      })
+
+      return closed
     },
     onSuccess: (_, variables) => {
       qc.invalidateQueries({ queryKey: ['shifts', business?.id] })

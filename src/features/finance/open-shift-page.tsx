@@ -7,6 +7,10 @@ import { MoneyInput } from '@/components/money/money-input'
 import { useDefaultLocation } from '@/features/business/hooks'
 import { useOpenShift, useOpenShiftMutation } from '@/features/finance/use-shifts'
 import { Term } from '@/features/help/term'
+import { useEmployeeSessionStore, getTerminalId } from '@/features/control/session-store'
+import { ROLE_LABELS } from '@/features/control/roles'
+import { UserRound, MonitorSmartphone, ShieldAlert } from 'lucide-react'
+import { Link } from 'react-router-dom'
 import { toast } from '@/hooks/use-toast'
 import { toReadableError } from '@/lib/errors'
 
@@ -20,6 +24,11 @@ export function OpenShiftPage() {
   // A handover arrives with the previous shift's counted cash pre-filled.
   const handoverFloat = searchParams.get('float')
   const [openingFloat, setOpeningFloat] = useState(handoverFloat ?? '')
+
+  const sessionContext = useEmployeeSessionStore((s) => s.context)
+  const hasOperator = sessionContext?.status === 'active'
+  const terminalId = getTerminalId()
+  const canOpen = hasOperator && !!terminalId && !!location && !existing
 
   async function handleOpen() {
     if (!location) return
@@ -58,9 +67,67 @@ export function OpenShiftPage() {
             </div>
           )}
 
-          <div className="flex items-center gap-2 rounded-md border border-border bg-surface-muted/50 p-3 text-sm text-text-secondary">
-            <MapPin className="size-4 text-text-muted" />
-            <span>Location: <span className="font-medium text-text-primary">{location?.name ?? '—'}</span></span>
+          {/* Identity first: a shift belongs to an employee on a terminal, so
+              both must be resolved before the float even matters. */}
+          {!hasOperator && (
+            <div className="flex items-start gap-2.5 rounded-md border border-danger/30 bg-danger/5 p-3">
+              <ShieldAlert className="mt-0.5 size-4 shrink-0 text-danger" />
+              <div className="text-sm">
+                <p className="font-medium text-text-primary">No operator signed in</p>
+                <p className="mt-0.5 text-text-secondary">
+                  A shift has to belong to a person. Sign in with a PIN at this terminal first.
+                </p>
+              </div>
+            </div>
+          )}
+
+          {!terminalId && (
+            <div className="flex items-start gap-2.5 rounded-md border border-danger/30 bg-danger/5 p-3">
+              <ShieldAlert className="mt-0.5 size-4 shrink-0 text-danger" />
+              <div className="text-sm">
+                <p className="font-medium text-text-primary">This device isn't a terminal</p>
+                <p className="mt-0.5 text-text-secondary">
+                  Register it in{' '}
+                  <Link to="/settings/terminals" className="font-medium text-accent-primary hover:underline">
+                    Settings › Terminals
+                  </Link>{' '}
+                  so drawer activity can be traced to a till.
+                </p>
+              </div>
+            </div>
+          )}
+
+          <div className="space-y-2 rounded-md border border-border bg-surface-muted/50 p-3 text-sm">
+            <div className="flex items-center gap-2 text-text-secondary">
+              <UserRound className="size-4 text-text-muted" />
+              <span>
+                Operator:{' '}
+                <span className="font-medium text-text-primary">
+                  {sessionContext?.display_name ?? 'Not signed in'}
+                </span>
+                {sessionContext && (
+                  <span className="ml-1 text-xs text-text-muted">
+                    ({ROLE_LABELS[sessionContext.role]})
+                  </span>
+                )}
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-text-secondary">
+              <MonitorSmartphone className="size-4 text-text-muted" />
+              <span>
+                Terminal:{' '}
+                <span className="font-medium text-text-primary">
+                  {sessionContext?.terminal_name ?? (terminalId ? 'This device' : 'Not registered')}
+                </span>
+              </span>
+            </div>
+            <div className="flex items-center gap-2 text-text-secondary">
+              <MapPin className="size-4 text-text-muted" />
+              <span>
+                Location:{' '}
+                <span className="font-medium text-text-primary">{location?.name ?? '—'}</span>
+              </span>
+            </div>
           </div>
 
           <div>
@@ -92,7 +159,7 @@ export function OpenShiftPage() {
           <Button variant="outline" onClick={() => navigate('/shifts')}>
             Cancel
           </Button>
-          <Button onClick={handleOpen} disabled={!location || !!existing || openMutation.isPending}>
+          <Button onClick={handleOpen} disabled={!canOpen || openMutation.isPending}>
             {openMutation.isPending && <Loader2 className="size-4 animate-spin" />}
             Open shift
           </Button>

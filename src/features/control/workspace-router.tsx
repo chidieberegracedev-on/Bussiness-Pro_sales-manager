@@ -1,8 +1,13 @@
+import { useState } from 'react'
 import { Navigate, Outlet } from 'react-router-dom'
 import { useEmployeeSessionStore } from '@/features/control/session-store'
-import { useRestoreSession, useAutoLock } from '@/features/control/use-session'
+import { useRestoreSession, useAutoLock, useTerminalEmployees } from '@/features/control/use-session'
 import { LockScreen } from '@/features/control/lock-screen'
 import { RegistryWorkspace } from '@/features/control/registry-workspace'
+import {
+  OperatorChoiceScreen,
+  useOperatorChoiceStore,
+} from '@/features/control/operator-gate'
 import { FullPageLoading } from '@/components/layout/full-page-loading'
 import { PermissionDeniedState } from '@/components/data/error-state'
 import { useActiveBusiness } from '@/features/business/hooks'
@@ -24,6 +29,11 @@ export function WorkspaceGate() {
   const token = useEmployeeSessionStore((s) => s.token)
   const context = useEmployeeSessionStore((s) => s.context)
   const restored = useEmployeeSessionStore((s) => s.restored)
+  const continueAsAdmin = useOperatorChoiceStore((s) => s.continueAsAdmin)
+  const [showPinPad, setShowPinPad] = useState(false)
+
+  const { role: deviceRole } = useActiveBusiness()
+  const { data: employees, isLoading: employeesLoading } = useTerminalEmployees()
 
   // Auto-lock only matters while a PIN session is actually active.
   useAutoLock(!!context && context.status === 'active')
@@ -33,12 +43,22 @@ export function WorkspaceGate() {
 
   if (context?.status === 'locked') return <LockScreen />
 
-  if (context?.status === 'active' && context.role === 'cashier') {
-    return <RegistryWorkspace />
+  if (context?.status === 'active') {
+    // A resolved operator governs. Cashiers get the Registry and nothing else.
+    if (context.role === 'cashier') return <RegistryWorkspace />
+    return <Outlet />
   }
 
-  // Manager, owner, or inventory staff (with or without a PIN session) continue
-  // into the management shell.
+  // No operator session. The account holder chooses who is working: themselves,
+  // or an employee via PIN. Identity comes before any workspace loads.
+  const canManage = deviceRole === 'owner' || deviceRole === 'manager'
+  const hasPinEmployees = (employees ?? []).some((e) => e.has_pin)
+
+  if (canManage && !continueAsAdmin && !employeesLoading && hasPinEmployees) {
+    if (showPinPad) return <LockScreen />
+    return <OperatorChoiceScreen onSwitchOperator={() => setShowPinPad(true)} />
+  }
+
   return <Outlet />
 }
 

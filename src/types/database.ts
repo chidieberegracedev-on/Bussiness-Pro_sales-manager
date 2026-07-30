@@ -569,6 +569,8 @@ export interface Database {
           status: ShiftStatus
           note: string | null
           created_at: string
+          /** Added by 0012 — the registered device the shift was opened on. */
+          terminal_id: string | null
         }
         Insert: Partial<Database['public']['Tables']['cash_shifts']['Row']> & {
           id: string

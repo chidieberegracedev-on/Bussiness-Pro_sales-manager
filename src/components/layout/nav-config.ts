@@ -80,12 +80,13 @@ export const NAV_ITEMS: NavItem[] = [
     ],
   },
   {
-    label: 'Control',
-    to: '/control/live-shifts',
+    label: 'Team & Control',
+    to: '/employees',
     icon: ShieldCheck,
     roles: MANAGEMENT,
     children: [
-      { label: 'Live shifts', to: '/control/live-shifts', icon: Users },
+      { label: 'Employees', to: '/employees', icon: Users },
+      { label: 'Live shifts', to: '/control/live-shifts', icon: Clock },
       { label: 'Reconciliation', to: '/control/reconciliation', icon: Scale },
       { label: 'Exceptions', to: '/control/exceptions', icon: ShieldQuestion },
       { label: 'Activity log', to: '/control/activity', icon: History },

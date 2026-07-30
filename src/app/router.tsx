@@ -44,7 +44,7 @@ import { DictionaryPage } from '@/features/help/dictionary-page'
 import { CalculatorPage } from '@/features/help/calculator-page'
 import { LearningCenterPage } from '@/features/help/learning-page'
 import { SettingsTerminalsPage } from '@/features/control/settings-terminals'
-import { SettingsEmployeesPage } from '@/features/control/settings-employees'
+import { EmployeeDirectoryPage } from '@/features/control/employee-directory'
 import { SettingsPermissionsPage } from '@/features/control/settings-permissions'
 import { LiveShiftsPage } from '@/features/control/live-shifts-page'
 import { ShiftDiscrepanciesPage } from '@/features/control/discrepancies-page'
@@ -136,6 +136,9 @@ export function AppRouter() {
 
             {/* Operational control — management only, enforced again server-side. */}
             <Route element={<RequireManagementAccess roles={[...MANAGE_ROLES]} />}>
+              {/* The employee directory is the identity foundation everything
+                  else hangs off, so it lives at the top level, not in Settings. */}
+              <Route path="/employees" element={<EmployeeDirectoryPage />} />
               <Route path="/control" element={<Navigate to="/control/live-shifts" replace />} />
               <Route path="/control/live-shifts" element={<LiveShiftsPage />} />
               <Route path="/control/reconciliation" element={<ShiftDiscrepanciesPage />} />
@@ -154,7 +157,7 @@ export function AppRouter() {
               <Route element={<RequireRole roles={[...MANAGE_ROLES]} />}>
                 <Route path="business" element={<SettingsBusinessPage />} />
                 <Route path="categories" element={<SettingsCategoriesPage />} />
-                <Route path="employees" element={<SettingsEmployeesPage />} />
+                <Route path="employees" element={<Navigate to="/employees" replace />} />
                 <Route path="terminals" element={<SettingsTerminalsPage />} />
                 <Route path="permissions" element={<SettingsPermissionsPage />} />
               </Route>
