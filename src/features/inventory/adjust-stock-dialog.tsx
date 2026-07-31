@@ -56,7 +56,7 @@ function AdjustStockForm({ context, onDone }: { context: StockDialogContext; onD
   const [movementId] = useState(() => crypto.randomUUID())
   const [serverError, setServerError] = useState<string | null>(null)
   const online = useOnlineStatus()
-  const { business } = useActiveBusiness()
+  const { business, membership } = useActiveBusiness()
   const gate = useAuthorizationGate()
   const sessionContext = useEmployeeSessionStore((s) => s.context)
   const hasSession = sessionContext?.status === 'active'
@@ -130,6 +130,7 @@ function AdjustStockForm({ context, onDone }: { context: StockDialogContext; onD
       await recordActorActivity({
         businessId: business.id,
         actionType: 'inventory_adjusted',
+        fallbackMemberId: membership?.id ?? null,
         authorizedBy,
         terminalId: sessionContext?.terminal_id ?? null,
         referenceType: 'variant',

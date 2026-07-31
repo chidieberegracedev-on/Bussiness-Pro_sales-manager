@@ -96,20 +96,24 @@ export function useOpenShift(locationId: string | undefined) {
 }
 
 export function useOpenShiftMutation() {
-  const { business } = useActiveBusiness()
+  const { business, membership, isMultiOperator } = useActiveBusiness()
   const qc = useQueryClient()
 
   return useMutation({
     mutationFn: async (input: { locationId: string; openingFloat: string }) => {
-      // A shift belongs to an employee on a terminal. Without a resolved
-      // operator session there is nobody to hold it accountable, so refuse.
+      // In employee mode a shift belongs to an employee on a terminal: without a
+      // resolved operator session there is nobody to hold it accountable, so
+      // refuse. On your own, there is exactly one person it could be — the
+      // drawer still gets counted, it just doesn't need a PIN to say whose.
       const ctx = readSessionContext()
       const terminalId = getTerminalId()
-      if (!ctx || ctx.status !== 'active') {
-        throw new Error('Sign in with your PIN before opening a shift.')
-      }
-      if (!terminalId) {
-        throw new Error('This device is not registered as a terminal yet.')
+      if (isMultiOperator) {
+        if (!ctx || ctx.status !== 'active') {
+          throw new Error('Sign in with your PIN before opening a shift.')
+        }
+        if (!terminalId) {
+          throw new Error('This device is not registered as a terminal yet.')
+        }
       }
 
       const shiftId = crypto.randomUUID()
@@ -136,14 +140,15 @@ export function useOpenShiftMutation() {
       await recordActorActivity({
         businessId: business!.id,
         actionType: 'shift_opened',
+        fallbackMemberId: membership?.id ?? null,
         terminalId,
         shiftId: shift.id,
         referenceType: 'shift',
         referenceId: shift.id,
         detail: {
           opening_float: floatDecimal.toString(),
-          operator: ctx.display_name ?? '',
-          terminal: ctx.terminal_name ?? '',
+          operator: ctx?.display_name ?? membership?.display_name ?? '',
+          terminal: ctx?.terminal_name ?? '',
         },
       })
 
@@ -157,7 +162,7 @@ export function useOpenShiftMutation() {
 }
 
 export function useCloseShiftMutation() {
-  const { business } = useActiveBusiness()
+  const { business, membership } = useActiveBusiness()
   const qc = useQueryClient()
 
   return useMutation({
@@ -185,6 +190,7 @@ export function useCloseShiftMutation() {
       await recordActorActivity({
         businessId: business!.id,
         actionType: 'shift_closed',
+        fallbackMemberId: membership?.id ?? null,
         terminalId: ctx?.terminal_id ?? getTerminalId(),
         shiftId: closed.id,
         referenceType: 'shift',

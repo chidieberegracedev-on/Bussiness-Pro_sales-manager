@@ -1,6 +1,7 @@
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useActiveBusiness, useDefaultLocation } from '@/features/business/hooks'
+import { useProfile } from '@/features/auth/use-profile'
 import type { Database, MemberRole, MemberStatus } from '@/types/database'
 
 export type Terminal = Database['public']['Tables']['terminals']['Row']
@@ -96,10 +97,12 @@ export interface EmployeeRow {
  * boolean without ever exposing the hash (0016).
  */
 export function useEmployees() {
-  const { business } = useActiveBusiness()
+  const { business, membership } = useActiveBusiness()
+  const { data: profile } = useProfile()
+  const myName = membership?.display_name ?? profile?.full_name ?? null
 
   return useQuery({
-    queryKey: ['employees', business?.id],
+    queryKey: ['employees', business?.id, membership?.id, myName],
     queryFn: async () => {
       const { data, error } = await supabase
         .from('v_operators')
@@ -112,7 +115,10 @@ export function useEmployees() {
         (m): EmployeeRow => ({
           member_id: m.member_id,
           is_account_user: m.is_account_user,
-          display_name: m.display_name ?? 'Unnamed',
+          // The account holder's member row predates 0018 and may carry no
+          // display_name. Their name is known — never show them "Unnamed".
+          display_name:
+            m.display_name ?? (m.member_id === membership?.id ? myName : null) ?? 'Unnamed',
           role: m.role,
           status: m.status,
           has_pin: m.has_pin,

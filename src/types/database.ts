@@ -18,6 +18,8 @@ export type AuthorizedAction =
   | 'void'
 export type HeldBasketStatus = 'held' | 'resumed' | 'discarded'
 export type MemberStatus = 'active' | 'invited' | 'suspended'
+/** Which half of the product a business is running (0018). */
+export type OperatorMode = 'single_owner' | 'multi_operator'
 export type StockMovementType =
   | 'initial'
   | 'restock'
@@ -90,6 +92,13 @@ export interface Database {
           country_code: string | null
           logo_path: string | null
           is_active: boolean
+          /**
+           * 'single_owner' — the owner just uses the software: no PIN, no
+           * operator selection, no terminal restriction, no shift enforcement.
+           * 'multi_operator' — activated when the first employee is added; the
+           * whole Phase 8 control layer becomes live (0018).
+           */
+          operator_mode: OperatorMode
           created_at: string
           updated_at: string
         }
@@ -1159,6 +1168,14 @@ export interface Database {
       reset_operator_pin: {
         Args: { p_business_id: string; p_member_id: string; p_new_pin: string }
         Returns: void
+      }
+      enable_operator_mode: {
+        Args: { p_business_id: string }
+        Returns: Database['public']['Tables']['businesses']['Row']
+      }
+      disable_operator_mode: {
+        Args: { p_business_id: string }
+        Returns: Database['public']['Tables']['businesses']['Row']
       }
       create_operator: {
         Args: {

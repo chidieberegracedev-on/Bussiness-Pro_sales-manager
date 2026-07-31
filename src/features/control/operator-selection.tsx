@@ -52,7 +52,7 @@ const ROLE_TINTS: Record<MemberRole, string> = {
  * Employees are operator records inside the business — they never have their own
  * email or password, and never touch the owner's.
  */
-export function OperatorSelectionScreen() {
+export function OperatorSelectionScreen({ onOwnerAdmin }: { onOwnerAdmin?: () => void } = {}) {
   const { business } = useActiveBusiness()
   const context = useEmployeeSessionStore((s) => s.context)
   const clear = useEmployeeSessionStore((s) => s.clear)
@@ -260,13 +260,22 @@ export function OperatorSelectionScreen() {
                   the Operators screen.
                 </p>
               )}
+
+              {/* The way out for the person who owns the login. This device is a
+                  till, but the account holder is still the account holder —
+                  they administer without a PIN, from any device. */}
+              {onOwnerAdmin && (
+                <Button variant="outline" className="mt-4 w-full" onClick={onOwnerAdmin}>
+                  <ShieldCheck className="size-4" /> Continue as owner (admin)
+                </Button>
+              )}
             </>
           )}
         </div>
 
         <p className="mt-5 text-center text-xs text-text-muted">
           Operators sign in with a PIN only — never an email or password.
-          {!isLocked && !selected && (
+          {!isLocked && !selected && !onOwnerAdmin && (
             <>
               {' '}
               <Link to="/employees" className="text-accent-primary hover:underline">

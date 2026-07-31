@@ -69,11 +69,22 @@ export interface PendingAuthorization {
  */
 export function useAuthorizationGate() {
   const authorize = useAuthorize()
+  const { membership, isMultiOperator } = useActiveBusiness()
   const [pending, setPending] = useState<PendingAuthorization | null>(null)
+
+  // Permission limits exist to constrain employees. In single-owner mode there
+  // are none, there is no PIN session for `authorize` to resolve an actor from,
+  // and asking the owner to approve their own action is theatre. Server-side
+  // RLS still governs the mutation itself — this only skips the approval step.
+  const singleOwnerGrant = !isMultiOperator && membership?.id ? membership.id : null
 
   const request = useCallback(
     (action: AuthorizedAction, context?: AuthorizationContext): Promise<AuthorizationGrant | null> =>
       new Promise((resolve) => {
+        if (singleOwnerGrant) {
+          resolve({ granted: true, initiated_by: singleOwnerGrant })
+          return
+        }
         authorize.mutate(
           { action, context },
           {
@@ -94,7 +105,7 @@ export function useAuthorizationGate() {
         )
       }),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [],
+    [singleOwnerGrant],
   )
 
   function resolvePending(grant: AuthorizationGrant | null) {

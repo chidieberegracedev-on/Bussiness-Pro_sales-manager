@@ -4,7 +4,7 @@ import { ArrowLeft, Loader2, Clock, MapPin, Info, ArrowRightLeft } from 'lucide-
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardFooter, CardHeader, CardTitle } from '@/components/ui/card'
 import { MoneyInput } from '@/components/money/money-input'
-import { useDefaultLocation } from '@/features/business/hooks'
+import { useActiveBusiness, useDefaultLocation } from '@/features/business/hooks'
 import { useOpenShift, useOpenShiftMutation } from '@/features/finance/use-shifts'
 import { Term } from '@/features/help/term'
 import { useEmployeeSessionStore, getTerminalId } from '@/features/control/session-store'
@@ -16,6 +16,7 @@ import { toReadableError } from '@/lib/errors'
 
 export function OpenShiftPage() {
   const navigate = useNavigate()
+  const { membership, isMultiOperator } = useActiveBusiness()
   const { data: location } = useDefaultLocation()
   const { data: existing } = useOpenShift(location?.id)
   const openMutation = useOpenShiftMutation()
@@ -28,7 +29,10 @@ export function OpenShiftPage() {
   const sessionContext = useEmployeeSessionStore((s) => s.context)
   const hasOperator = sessionContext?.status === 'active'
   const terminalId = getTerminalId()
-  const canOpen = hasOperator && !!terminalId && !!location && !existing
+  // Identity is only a precondition when there's more than one identity. In
+  // single-owner mode the drawer belongs to the account holder by definition.
+  const identityReady = !isMultiOperator || (hasOperator && !!terminalId)
+  const canOpen = identityReady && !!location && !existing
 
   async function handleOpen() {
     if (!location) return
@@ -69,7 +73,7 @@ export function OpenShiftPage() {
 
           {/* Identity first: a shift belongs to an employee on a terminal, so
               both must be resolved before the float even matters. */}
-          {!hasOperator && (
+          {isMultiOperator && !hasOperator && (
             <div className="flex items-start gap-2.5 rounded-md border border-danger/30 bg-danger/5 p-3">
               <ShieldAlert className="mt-0.5 size-4 shrink-0 text-danger" />
               <div className="text-sm">
@@ -81,7 +85,7 @@ export function OpenShiftPage() {
             </div>
           )}
 
-          {!terminalId && (
+          {isMultiOperator && !terminalId && (
             <div className="flex items-start gap-2.5 rounded-md border border-danger/30 bg-danger/5 p-3">
               <ShieldAlert className="mt-0.5 size-4 shrink-0 text-danger" />
               <div className="text-sm">
@@ -103,7 +107,8 @@ export function OpenShiftPage() {
               <span>
                 Operator:{' '}
                 <span className="font-medium text-text-primary">
-                  {sessionContext?.display_name ?? 'Not signed in'}
+                  {sessionContext?.display_name ??
+                    (isMultiOperator ? 'Not signed in' : membership?.display_name || 'You')}
                 </span>
                 {sessionContext && (
                   <span className="ml-1 text-xs text-text-muted">
@@ -112,15 +117,20 @@ export function OpenShiftPage() {
                 )}
               </span>
             </div>
-            <div className="flex items-center gap-2 text-text-secondary">
-              <MonitorSmartphone className="size-4 text-text-muted" />
-              <span>
-                Terminal:{' '}
-                <span className="font-medium text-text-primary">
-                  {sessionContext?.terminal_name ?? (terminalId ? 'This device' : 'Not registered')}
+            {/* A terminal only means something once there's more than one till
+                and more than one person standing at them. */}
+            {isMultiOperator && (
+              <div className="flex items-center gap-2 text-text-secondary">
+                <MonitorSmartphone className="size-4 text-text-muted" />
+                <span>
+                  Terminal:{' '}
+                  <span className="font-medium text-text-primary">
+                    {sessionContext?.terminal_name ??
+                      (terminalId ? 'This device' : 'Not registered')}
+                  </span>
                 </span>
-              </span>
-            </div>
+              </div>
+            )}
             <div className="flex items-center gap-2 text-text-secondary">
               <MapPin className="size-4 text-text-muted" />
               <span>

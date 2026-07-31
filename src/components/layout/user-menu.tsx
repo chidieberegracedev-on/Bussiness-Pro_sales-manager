@@ -8,6 +8,7 @@ import { useBusinessStore } from '@/features/business/store'
 import { useCartStore } from '@/features/pos/cart-store'
 import { useEmployeeSessionStore } from '@/features/control/session-store'
 import { useEndSession } from '@/features/control/use-session'
+import { useWorkspaceModeStore } from '@/features/control/workspace-router'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -36,6 +37,8 @@ export function UserMenu() {
   const navigate = useNavigate()
   const sessionContext = useEmployeeSessionStore((s) => s.context)
   const endSession = useEndSession()
+  const ownerAdmin = useWorkspaceModeStore((s) => s.ownerAdmin)
+  const setOwnerAdmin = useWorkspaceModeStore((s) => s.setOwnerAdmin)
 
   /**
    * Ends the OPERATOR session only. The business stays signed in to Supabase —
@@ -43,6 +46,9 @@ export function UserMenu() {
    */
   function handleSwitchOperator() {
     useCartStore.getState().reset()
+    // Drop the admin bypass too, or the gate would send the owner straight back
+    // into admin instead of the operator screen they just asked for.
+    useWorkspaceModeStore.getState().setOwnerAdmin(false)
     endSession.mutate()
   }
 
@@ -58,6 +64,7 @@ export function UserMenu() {
     // The operator session lives on top of the business session — dropping the
     // business must drop the operator with it.
     useEmployeeSessionStore.getState().clear()
+    useWorkspaceModeStore.getState().setOwnerAdmin(false)
     queryClient.clear()
     navigate('/sign-in', { replace: true })
   }
@@ -97,6 +104,13 @@ export function UserMenu() {
         {sessionContext?.status === 'active' && (
           <DropdownMenuItem onSelect={handleSwitchOperator}>
             <Repeat className="size-4" /> Switch operator
+          </DropdownMenuItem>
+        )}
+        {/* Administering a till device. The way back to the sign-in screen for
+            whoever is about to work it. */}
+        {sessionContext?.status !== 'active' && ownerAdmin && (
+          <DropdownMenuItem onSelect={() => setOwnerAdmin(false)}>
+            <Repeat className="size-4" /> Back to operator sign-in
           </DropdownMenuItem>
         )}
         <DropdownMenuSeparator />

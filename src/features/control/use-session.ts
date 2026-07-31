@@ -2,6 +2,7 @@ import { useEffect } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import { supabase } from '@/lib/supabase'
 import { useActiveBusiness } from '@/features/business/hooks'
+import { useProfile } from '@/features/auth/use-profile'
 import {
   useEmployeeSessionStore,
   getTerminalId,
@@ -23,10 +24,12 @@ export interface EmployeeOption {
  * rather than reading the hash.
  */
 export function useTerminalEmployees() {
-  const { business } = useActiveBusiness()
+  const { business, membership } = useActiveBusiness()
+  const { data: profile } = useProfile()
+  const myName = membership?.display_name ?? profile?.full_name ?? null
 
   return useQuery({
-    queryKey: ['terminal-employees', business?.id],
+    queryKey: ['terminal-employees', business?.id, membership?.id, myName],
     queryFn: async () => {
       // v_operators exposes has_pin as a boolean; employee_pins itself is
       // unreadable by design, so querying it directly always reads as "no PIN".
@@ -46,7 +49,10 @@ export function useTerminalEmployees() {
       return ((data ?? []) as Raw[]).map(
         (m): EmployeeOption => ({
           member_id: m.member_id,
-          display_name: m.display_name ?? 'Unnamed',
+          // The account holder's row may have no display_name (pre-0018). Their
+          // own name is right here — don't put "Unnamed" on the sign-in list.
+          display_name:
+            m.display_name ?? (m.member_id === membership?.id ? myName : null) ?? 'Unnamed',
           role: m.role,
           has_pin: m.has_pin,
           locked_until: m.locked_until,

@@ -7,6 +7,8 @@ import {
   Archive,
   ArchiveRestore,
   Link2,
+  Unlink,
+  Info,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -36,7 +38,7 @@ const DEVICE_TYPES = [
 ]
 
 export function SettingsTerminalsPage() {
-  const { business } = useActiveBusiness()
+  const { business, isMultiOperator } = useActiveBusiness()
   const locale = useLocale()
   const { data: terminals, isLoading, isError, refetch } = useTerminals(true)
   const createTerminal = useCreateTerminal()
@@ -54,12 +56,14 @@ export function SettingsTerminalsPage() {
     try {
       const terminal = await createTerminal.mutateAsync({ deviceName: trimmed, deviceType: type })
       setName('')
-      toast({ title: 'Terminal registered', description: terminal.device_name })
-      // First terminal on an unclaimed device: claim it automatically.
-      if (!claimed) {
-        setTerminalId(terminal.id)
-        setClaimed(terminal.id)
-      }
+      // Deliberately NOT claimed automatically. Binding a device to a terminal
+      // turns it into a till that asks for a PIN, and the device doing the
+      // registering is usually the owner's own — claiming it silently would
+      // hand them a lock screen they never asked for.
+      toast({
+        title: 'Terminal registered',
+        description: `${terminal.device_name} — use "Use on this device" on the till itself.`,
+      })
     } catch (error) {
       toast({
         variant: 'destructive',
@@ -74,7 +78,18 @@ export function SettingsTerminalsPage() {
     setClaimed(id)
     toast({
       title: 'This device is now that terminal',
-      description: 'Employees signing in here will be recorded against it.',
+      description: isMultiOperator
+        ? 'It will ask for an operator PIN from now on. You can still reach admin from here.'
+        : 'Employees signing in here will be recorded against it.',
+    })
+  }
+
+  function unclaim() {
+    setTerminalId(null)
+    setClaimed(null)
+    toast({
+      title: 'This device is no longer a terminal',
+      description: 'It goes back to being an ordinary admin device.',
     })
   }
 
@@ -101,6 +116,17 @@ export function SettingsTerminalsPage() {
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
+          {!isMultiOperator && (
+            <div className="flex items-start gap-2.5 rounded-md border border-border bg-surface-muted/50 p-3 text-sm text-text-secondary">
+              <Info className="mt-0.5 size-4 shrink-0 text-text-muted" />
+              <p>
+                You're the only person using this business, so terminals aren't doing anything yet —
+                there's nobody to tell apart. They start to matter when you add an employee. Nothing
+                here will put a sign-in screen in front of you.
+              </p>
+            </div>
+          )}
+
           <form onSubmit={handleCreate} className="flex flex-wrap gap-2">
             <Input
               value={name}
@@ -208,9 +234,16 @@ export function SettingsTerminalsPage() {
           )}
 
           {claimed && (
-            <p className="text-xs text-text-muted">
-              This browser is acting as a registered terminal. Clearing site data will unlink it.
-            </p>
+            <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border border-border bg-surface-muted/50 p-3">
+              <p className="text-xs text-text-muted">
+                This browser is acting as a registered terminal
+                {isMultiOperator && ', so it shows the operator sign-in screen'}. Clearing site data
+                will unlink it.
+              </p>
+              <Button variant="outline" size="sm" onClick={unclaim}>
+                <Unlink className="size-3.5" /> Stop using this device as a terminal
+              </Button>
+            </div>
           )}
         </CardContent>
       </Card>

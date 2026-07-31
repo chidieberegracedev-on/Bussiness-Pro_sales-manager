@@ -49,7 +49,7 @@ import { recordActorActivity } from '@/features/control/activity'
  * server rejects those actions regardless of what is rendered (BR-C2.2).
  */
 export function RegistryWorkspace() {
-  const { business } = useActiveBusiness()
+  const { business, membership } = useActiveBusiness()
   const locale = useLocale()
   const context = useEmployeeSessionStore((s) => s.context)
   const { data: location } = useDefaultLocation()
@@ -74,6 +74,9 @@ export function RegistryWorkspace() {
 
   const drawerCash = summary.data?.drawerCash ?? new Decimal(openShift?.opening_float ?? '0')
 
+  // With no PIN session the person at the till is the account holder.
+  const operatorName = context?.display_name ?? membership?.display_name ?? ''
+
   /** Clearing the whole basket is a gated action (BR-C4.6). */
   async function clearBasket() {
     if (lines.length === 0) return
@@ -85,6 +88,7 @@ export function RegistryWorkspace() {
     await recordActorActivity({
       businessId: business!.id,
       actionType: 'basket_voided',
+      fallbackMemberId: membership?.id ?? null,
       authorizedBy: grant.authorized_by ?? null,
       terminalId: context?.terminal_id ?? null,
       shiftId: openShift?.id ?? null,
@@ -108,6 +112,7 @@ export function RegistryWorkspace() {
     await recordActorActivity({
       businessId: business!.id,
       actionType: 'line_voided',
+      fallbackMemberId: membership?.id ?? null,
       authorizedBy: grant.authorized_by ?? null,
       terminalId: context?.terminal_id ?? null,
       shiftId: openShift?.id ?? null,
@@ -149,14 +154,14 @@ export function RegistryWorkspace() {
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
           <div className="flex items-center gap-2.5">
             <span className="flex size-9 items-center justify-center rounded-full bg-accent-primary/10 text-sm font-semibold text-accent-primary">
-              {(context?.display_name ?? '?').slice(0, 1).toUpperCase()}
+              {(operatorName || '?').slice(0, 1).toUpperCase()}
             </span>
             <div>
               <p className="text-sm font-semibold leading-tight text-text-primary">
-                {context?.display_name ?? 'Operator'}
+                {operatorName || 'Operator'}
               </p>
               <p className="text-xs text-text-muted">
-                {context ? ROLE_LABELS[context.role] : ''}
+                {context ? ROLE_LABELS[context.role] : membership ? ROLE_LABELS[membership.role] : ''}
                 {context?.terminal_name && ` · ${context.terminal_name}`}
               </p>
             </div>
@@ -181,19 +186,23 @@ export function RegistryWorkspace() {
             </span>
           </div>
 
-          <div className="ml-auto flex items-center gap-2">
-            <Button variant="outline" size="sm" onClick={() => lock.mutate()}>
-              <Lock className="size-3.5" /> Lock screen
-            </Button>
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={() => endSession.mutate()}
-              aria-label="Sign out of this terminal"
-            >
-              <LogOut className="size-3.5" />
-            </Button>
-          </div>
+          {/* Nothing to lock or sign out of without an operator session — in
+              single-owner mode the Supabase login is the whole session. */}
+          {context && (
+            <div className="ml-auto flex items-center gap-2">
+              <Button variant="outline" size="sm" onClick={() => lock.mutate()}>
+                <Lock className="size-3.5" /> Lock screen
+              </Button>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => endSession.mutate()}
+                aria-label="Sign out of this terminal"
+              >
+                <LogOut className="size-3.5" />
+              </Button>
+            </div>
+          )}
         </div>
       </header>
 

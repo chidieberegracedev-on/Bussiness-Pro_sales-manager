@@ -31,6 +31,7 @@ import {
   useResetOperatorPin,
   type EmployeeRow,
 } from '@/features/control/use-terminals'
+import { EnableEmployeeModeDialog } from '@/features/control/enable-employee-mode'
 import { ROLE_DESCRIPTIONS, ROLE_LABELS } from '@/features/control/roles'
 import { useActiveBusiness } from '@/features/business/hooks'
 import { useLocale } from '@/features/auth/use-locale'
@@ -49,7 +50,7 @@ const ASSIGNABLE_ROLES: MemberRole[] = ['owner', 'manager', 'inventory_staff', '
  * lists, so an empty directory means an empty lock screen.
  */
 export function EmployeeDirectoryPage() {
-  const { business, role: myRole, membership } = useActiveBusiness()
+  const { business, role: myRole, membership, isMultiOperator } = useActiveBusiness()
   const locale = useLocale()
   const myMemberId = membership?.id
   const isOwner = myRole === 'owner'
@@ -65,6 +66,14 @@ export function EmployeeDirectoryPage() {
   const [pinTarget, setPinTarget] = useState<EmployeeRow | null>(null)
   const [nameTarget, setNameTarget] = useState<EmployeeRow | null>(null)
   const [addOpen, setAddOpen] = useState(false)
+  const [enableOpen, setEnableOpen] = useState(false)
+
+  // In single-owner mode "add an operator" IS "switch the business over", so it
+  // runs the wizard rather than dropping straight into a PIN pad.
+  function startAdd() {
+    if (isMultiOperator) setAddOpen(true)
+    else setEnableOpen(true)
+  }
 
   const filtered = useMemo(() => {
     let list = employees ?? []
@@ -103,11 +112,16 @@ export function EmployeeDirectoryPage() {
   return (
     <div>
       <PageHeader
-        title="Operators"
-        description="Everyone who works this business, what they're allowed to do, and the PIN they sign in with."
+        title={isMultiOperator ? 'Operators' : 'Your team'}
+        description={
+          isMultiOperator
+            ? "Everyone who works this business, what they're allowed to do, and the PIN they sign in with."
+            : "It's just you right now. Add someone and the software starts tracking who did what."
+        }
         actions={
-          <Button onClick={() => setAddOpen(true)}>
-            <Plus className="size-4" /> Add operator
+          <Button onClick={startAdd}>
+            <Plus className="size-4" />
+            {isMultiOperator ? 'Add operator' : 'Add employee'}
           </Button>
         }
       />
@@ -116,17 +130,31 @@ export function EmployeeDirectoryPage() {
       <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-info/30 bg-info/5 p-3">
         <Info className="mt-0.5 size-4 shrink-0 text-info" />
         <div className="text-sm">
-          <p className="font-medium text-text-primary">How operators sign in</p>
-          <p className="mt-0.5 text-text-secondary">
-            This business has one account — the email and password you signed in with. Everyone else
-            is an operator inside it: they pick their name at a terminal and enter their own 4-digit
-            PIN. No operator ever has their own email, password, or account.
-          </p>
+          {isMultiOperator ? (
+            <>
+              <p className="font-medium text-text-primary">How operators sign in</p>
+              <p className="mt-0.5 text-text-secondary">
+                This business has one account — the email and password you signed in with. Everyone
+                else is an operator inside it: they pick their name at a terminal and enter their own
+                4-digit PIN. No operator ever has their own email, password, or account.
+              </p>
+            </>
+          ) : (
+            <>
+              <p className="font-medium text-text-primary">You're working solo</p>
+              <p className="mt-0.5 text-text-secondary">
+                No PINs, no sign-in screens, no shift rules — you just use the software. All of that
+                switches on the day you add your first employee, because that's the day it starts to
+                matter who did what.
+              </p>
+            </>
+          )}
         </div>
       </div>
 
-      {/* The owner is an operator too, and needs a PIN to reach their workspace. */}
-      {myMembership && !myMembership.has_pin && (
+      {/* The owner is an operator too, and needs a PIN to reach their workspace.
+          Only once there are other people: on your own, it protects nothing. */}
+      {isMultiOperator && myMembership && !myMembership.has_pin && (
         <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-warning/40 bg-warning/5 p-3">
           <Crown className="size-5 shrink-0 text-warning" />
           <div className="min-w-0 flex-1 text-sm">
@@ -142,7 +170,7 @@ export function EmployeeDirectoryPage() {
         </div>
       )}
 
-      {withoutPin > 0 && (
+      {isMultiOperator && withoutPin > 0 && (
         <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-warning/30 bg-warning/5 p-3">
           <ShieldAlert className="mt-0.5 size-4 shrink-0 text-warning" />
           <p className="text-sm text-text-secondary">
@@ -152,7 +180,8 @@ export function EmployeeDirectoryPage() {
         </div>
       )}
 
-      <Card className="mb-4">
+      {/* Filters earn their space once there's a team to filter. */}
+      <Card className={cn('mb-4', !isMultiOperator && 'hidden')}>
         <CardContent className="flex flex-wrap items-center gap-3 pt-6">
           <div className="relative min-w-48 flex-1">
             <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-muted" />
@@ -200,7 +229,7 @@ export function EmployeeDirectoryPage() {
           title="No operators yet"
           description="Operators are the people who work this business. Each one gets a role and a PIN — that PIN is how they sign in at a terminal."
           action={
-            <Button onClick={() => setAddOpen(true)}>
+            <Button onClick={startAdd}>
               <Plus className="size-4" /> Add your first operator
             </Button>
           }
@@ -241,15 +270,18 @@ export function EmployeeDirectoryPage() {
                       <p className="truncate font-medium text-text-primary">
                         {employee.display_name}
                       </p>
-                      {employee.has_pin ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success">
-                          <Check className="size-3" /> PIN set
-                        </span>
-                      ) : (
-                        <span className="rounded-full bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning">
-                          No PIN
-                        </span>
-                      )}
+                      {/* A PIN badge on a business of one is a warning about
+                          nothing — there is no lock screen to fail. */}
+                      {isMultiOperator &&
+                        (employee.has_pin ? (
+                          <span className="inline-flex items-center gap-1 rounded-full bg-success/10 px-2 py-0.5 text-xs font-medium text-success">
+                            <Check className="size-3" /> PIN set
+                          </span>
+                        ) : (
+                          <span className="rounded-full bg-warning/10 px-2 py-0.5 text-xs font-medium text-warning">
+                            No PIN
+                          </span>
+                        ))}
                       {locked && (
                         <span className="inline-flex items-center gap-1 rounded-full bg-danger/10 px-2 py-0.5 text-xs font-medium text-danger">
                           <ShieldAlert className="size-3" /> Locked
@@ -302,10 +334,12 @@ export function EmployeeDirectoryPage() {
                     <Pencil className="size-4" />
                   </Button>
 
-                  <Button variant="outline" size="sm" onClick={() => setPinTarget(employee)}>
-                    <KeyRound className="size-3.5" />
-                    {employee.has_pin ? 'Reset PIN' : 'Set PIN'}
-                  </Button>
+                  {isMultiOperator && (
+                    <Button variant="outline" size="sm" onClick={() => setPinTarget(employee)}>
+                      <KeyRound className="size-3.5" />
+                      {employee.has_pin ? 'Reset PIN' : 'Set PIN'}
+                    </Button>
+                  )}
 
                   <Button
                     variant="ghost"
@@ -328,12 +362,25 @@ export function EmployeeDirectoryPage() {
         </ul>
       )}
 
-      <p className="mt-6 text-xs text-text-muted">
-        PINs are stored as one-way hashes — nobody, including owners, can read an existing PIN back.
-        It can only be replaced. Five wrong attempts locks that operator out for 15 minutes.
-        {!isOwner && ' Only an owner can change roles or deactivate an operator.'}
-      </p>
+      {isMultiOperator ? (
+        <p className="mt-6 text-xs text-text-muted">
+          PINs are stored as one-way hashes — nobody, including owners, can read an existing PIN
+          back. It can only be replaced. Five wrong attempts locks that operator out for 15 minutes.
+          {!isOwner && ' Only an owner can change roles or deactivate an operator.'}
+        </p>
+      ) : (
+        <p className="mt-6 text-xs text-text-muted">
+          Adding an employee turns on PINs, terminal sign-in, and shift tracking. You'll be walked
+          through it, and you keep full dashboard access from this device either way.
+        </p>
+      )}
 
+      {enableOpen && (
+        <EnableEmployeeModeDialog
+          ownerHasPin={!!myMembership?.has_pin}
+          onClose={() => setEnableOpen(false)}
+        />
+      )}
       {addOpen && <AddOperatorDialog isOwner={isOwner} onClose={() => setAddOpen(false)} />}
       {pinTarget && <SetPinDialog employee={pinTarget} onClose={() => setPinTarget(null)} />}
       {nameTarget && (
