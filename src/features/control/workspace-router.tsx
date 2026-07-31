@@ -1,5 +1,7 @@
 import { create } from 'zustand'
 import { Navigate, Outlet } from 'react-router-dom'
+import { AlertCircle } from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import { useEmployeeSessionStore } from '@/features/control/session-store'
 import { useRestoreSession, useAutoLock, useTerminalEmployees } from '@/features/control/use-session'
 import { OperatorSelectionScreen } from '@/features/control/operator-selection'
@@ -12,6 +14,8 @@ import type { MemberRole } from '@/types/database'
 
 const BOOTSTRAP_KEY = 'bp-setup-bootstrap'
 
+const PIN_SET_KEY = 'bp-pin-established'
+
 interface BootstrapState {
   /**
    * Set only when no operator has a PIN yet, so the account holder can reach
@@ -19,6 +23,13 @@ interface BootstrapState {
    */
   bootstrapping: boolean
   setBootstrapping: (value: boolean) => void
+  /**
+   * Latched the moment we successfully set a PIN. The gate trusts this over the
+   * operator query: if that query is broken or unreadable, a false "no PINs
+   * exist" would otherwise loop the owner back onto the setup screen forever.
+   */
+  pinEstablished: boolean
+  markPinEstablished: () => void
 }
 
 export const useBootstrapStore = create<BootstrapState>((set) => ({
@@ -27,6 +38,11 @@ export const useBootstrapStore = create<BootstrapState>((set) => ({
     if (value) sessionStorage.setItem(BOOTSTRAP_KEY, 'true')
     else sessionStorage.removeItem(BOOTSTRAP_KEY)
     set({ bootstrapping: value })
+  },
+  pinEstablished: sessionStorage.getItem(PIN_SET_KEY) === 'true',
+  markPinEstablished: () => {
+    sessionStorage.setItem(PIN_SET_KEY, 'true')
+    set({ pinEstablished: true, bootstrapping: false })
   },
 }))
 
@@ -49,8 +65,15 @@ export function WorkspaceGate() {
   const bootstrapping = useBootstrapStore((s) => s.bootstrapping)
   const setBootstrapping = useBootstrapStore((s) => s.setBootstrapping)
 
-  const { data: members, isLoading: membersLoading, refetch } = useTerminalEmployees()
+  const {
+    data: members,
+    isLoading: membersLoading,
+    isError: membersError,
+    refetch,
+  } = useTerminalEmployees()
   const { role: deviceRole } = useActiveBusiness()
+  const pinEstablished = useBootstrapStore((s) => s.pinEstablished)
+  const markPinEstablished = useBootstrapStore((s) => s.markPinEstablished)
 
   useAutoLock(!!context && context.status === 'active')
 
@@ -68,7 +91,21 @@ export function WorkspaceGate() {
 
   if (membersLoading) return <FullPageLoading />
 
-  const anyPins = (members ?? []).some((m) => m.has_pin)
+  // The operator query failed. Never silently fall through to the setup screen —
+  // that reads as "no PINs exist" and loops the operator with no way out.
+  if (membersError) {
+    return (
+      <GateError
+        onRetry={() => refetch()}
+        canBypass={deviceRole === 'owner' || deviceRole === 'manager'}
+        onBypass={() => setBootstrapping(true)}
+      />
+    )
+  }
+
+  // pinEstablished is latched locally the moment a PIN is saved, so a stale or
+  // wrong `has_pin` can never trap the owner on the setup screen again.
+  const anyPins = pinEstablished || (members ?? []).some((m) => m.has_pin)
 
   // Fresh business: nobody has a PIN, so the gate would be unpassable. Let the
   // account holder set theirs first — this is the only way past without a PIN.
@@ -77,7 +114,7 @@ export function WorkspaceGate() {
       return (
         <OwnerPinSetupScreen
           onDone={() => {
-            setBootstrapping(false)
+            markPinEstablished()
             refetch()
           }}
         />
@@ -92,6 +129,38 @@ export function WorkspaceGate() {
   if (bootstrapping) setBootstrapping(false)
 
   return <OperatorSelectionScreen />
+}
+
+function GateError({
+  onRetry,
+  canBypass,
+  onBypass,
+}: {
+  onRetry: () => void
+  canBypass: boolean
+  onBypass: () => void
+}) {
+  return (
+    <div className="flex min-h-dvh items-center justify-center bg-background-subtle p-6">
+      <div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 text-center shadow-sm">
+        <div className="mx-auto mb-3 flex size-11 items-center justify-center rounded-xl bg-danger/10 text-danger">
+          <AlertCircle className="size-5" />
+        </div>
+        <h1 className="text-lg font-semibold text-text-primary">Couldn't load operators</h1>
+        <p className="mt-1 text-sm text-text-secondary">
+          The sign-in list didn't load, so we can't show who can work this terminal.
+        </p>
+        <div className="mt-4 flex flex-col gap-2">
+          <Button onClick={onRetry}>Try again</Button>
+          {canBypass && (
+            <Button variant="outline" onClick={onBypass}>
+              Continue to setup
+            </Button>
+          )}
+        </div>
+      </div>
+    </div>
+  )
 }
 
 /**

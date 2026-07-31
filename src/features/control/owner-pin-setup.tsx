@@ -130,6 +130,12 @@ export function OwnerPinSetupScreen({ onDone }: { onDone: () => void }) {
           Forgotten it later? Sign in with your business email and reset it from the Operators
           screen.
         </p>
+
+        {/* Never a dead end. If a PIN was saved but the screen is still here,
+            the operator list is misreporting — go through anyway. */}
+        <Button variant="ghost" size="sm" className="mt-2 w-full" onClick={onDone}>
+          Skip for now
+        </Button>
       </div>
     </div>
   )
