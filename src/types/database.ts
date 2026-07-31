@@ -101,7 +101,8 @@ export interface Database {
         Row: {
           id: string
           business_id: string
-          user_id: string
+          /** Null for PIN-only operators, who have no Supabase account (0014). */
+          user_id: string | null
           role: MemberRole
           status: MemberStatus
           display_name: string | null
@@ -111,7 +112,6 @@ export interface Database {
         }
         Insert: Partial<Database['public']['Tables']['business_members']['Row']> & {
           business_id: string
-          user_id: string
         }
         Update: Partial<Database['public']['Tables']['business_members']['Row']>
         Relationships: [
@@ -1135,6 +1135,25 @@ export interface Database {
       set_employee_pin: {
         Args: { p_business_id: string; p_member_id: string; p_pin: string }
         Returns: void
+      }
+      create_operator: {
+        Args: {
+          p_business_id: string
+          p_display_name: string
+          p_role: MemberRole
+          p_pin?: string | null
+        }
+        Returns: Database['public']['Tables']['business_members']['Row']
+      }
+      update_operator: {
+        Args: {
+          p_business_id: string
+          p_member_id: string
+          p_display_name?: string | null
+          p_role?: MemberRole | null
+          p_status?: MemberStatus | null
+        }
+        Returns: Database['public']['Tables']['business_members']['Row']
       }
       pin_unlock: {
         Args: {

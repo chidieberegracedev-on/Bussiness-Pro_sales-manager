@@ -12,6 +12,7 @@ import {
   Loader2,
   X,
   Crown,
+  Plus,
 } from 'lucide-react'
 import { PageHeader } from '@/components/layout/page-header'
 import { Button } from '@/components/ui/button'
@@ -27,6 +28,7 @@ import {
   useEmployees,
   useSetEmployeePin,
   useUpdateEmployeeRole,
+  useCreateOperator,
   type EmployeeRow,
 } from '@/features/control/use-terminals'
 import { ROLE_DESCRIPTIONS, ROLE_LABELS } from '@/features/control/roles'
@@ -63,6 +65,7 @@ export function EmployeeDirectoryPage() {
 
   const [pinTarget, setPinTarget] = useState<EmployeeRow | null>(null)
   const [nameTarget, setNameTarget] = useState<EmployeeRow | null>(null)
+  const [addOpen, setAddOpen] = useState(false)
 
   const filtered = useMemo(() => {
     let list = employees ?? []
@@ -102,6 +105,11 @@ export function EmployeeDirectoryPage() {
       <PageHeader
         title="Operators"
         description="Everyone who works this business, what they're allowed to do, and the PIN they sign in with."
+        actions={
+          <Button onClick={() => setAddOpen(true)}>
+            <Plus className="size-4" /> Add operator
+          </Button>
+        }
       />
 
       {/* The whole model in two lines, so nobody goes looking for an invite. */}
@@ -191,6 +199,11 @@ export function EmployeeDirectoryPage() {
           icon={Users}
           title="No operators yet"
           description="Operators are the people who work this business. Each one gets a role and a PIN — that PIN is how they sign in at a terminal."
+          action={
+            <Button onClick={() => setAddOpen(true)}>
+              <Plus className="size-4" /> Add your first operator
+            </Button>
+          }
         />
       )}
 
@@ -321,6 +334,7 @@ export function EmployeeDirectoryPage() {
         {!isOwner && ' Only an owner can change roles or deactivate an operator.'}
       </p>
 
+      {addOpen && <AddOperatorDialog isOwner={isOwner} onClose={() => setAddOpen(false)} />}
       {pinTarget && <SetPinDialog employee={pinTarget} onClose={() => setPinTarget(null)} />}
       {nameTarget && (
         <RenameDialog
@@ -330,6 +344,161 @@ export function EmployeeDirectoryPage() {
         />
       )}
     </div>
+  )
+}
+
+/**
+ * Creates a PIN-only operator. Name, role, and PIN in one step — there is no
+ * email, no invite, and no account for them to activate. The PIN is set in the
+ * same server call, so the operator can sign in the moment this closes.
+ */
+function AddOperatorDialog({ isOwner, onClose }: { isOwner: boolean; onClose: () => void }) {
+  const createOperator = useCreateOperator()
+  const [step, setStep] = useState<'details' | 'pin'>('details')
+  const [name, setName] = useState('')
+  const [role, setRole] = useState<MemberRole>('cashier')
+  const [pin, setPin] = useState<string | null>(null)
+  const [confirming, setConfirming] = useState(false)
+  const [error, setError] = useState<string | null>(null)
+
+  // Managers can add staff but not mint owners — the RPC enforces this too.
+  const roleOptions = isOwner ? ASSIGNABLE_ROLES : ASSIGNABLE_ROLES.filter((r) => r !== 'owner')
+
+  function handlePinSubmit(entered: string) {
+    setError(null)
+    if (!confirming) {
+      setPin(entered)
+      setConfirming(true)
+      return
+    }
+    if (entered !== pin) {
+      setPin(null)
+      setConfirming(false)
+      setError("Those PINs didn't match. Start again.")
+      return
+    }
+    createOperator.mutate(
+      { displayName: name.trim(), role, pin: entered },
+      {
+        onSuccess: (member) => {
+          toast({
+            title: 'Operator added',
+            description: `${member.display_name ?? name.trim()} can sign in with their PIN now.`,
+          })
+          onClose()
+        },
+        onError: (e) => {
+          setPin(null)
+          setConfirming(false)
+          setError(toReadableError(e))
+        },
+      },
+    )
+  }
+
+  const detailsReady = name.trim().length > 0
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent className="max-w-sm">
+        <DialogHeader>
+          <DialogTitle>Add operator</DialogTitle>
+        </DialogHeader>
+
+        {step === 'details' ? (
+          <div className="space-y-4">
+            <div>
+              <label className="text-sm font-medium text-text-secondary">Full name</label>
+              <Input
+                className="mt-1"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Sarah Adeyemi"
+                autoFocus
+              />
+              <p className="mt-1 text-xs text-text-muted">
+                Shown on the terminal sign-in list and against everything they do.
+              </p>
+            </div>
+
+            <div>
+              <label className="text-sm font-medium text-text-secondary">Role</label>
+              <Select value={role} onValueChange={(v) => setRole(v as MemberRole)}>
+                <SelectTrigger className="mt-1" aria-label="Role">
+                  <SelectValue>{ROLE_LABELS[role]}</SelectValue>
+                </SelectTrigger>
+                <SelectContent>
+                  {roleOptions.map((r) => (
+                    <SelectItem key={r} value={r}>
+                      {ROLE_LABELS[r]}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <p className="mt-1 text-xs text-text-muted">{ROLE_DESCRIPTIONS[role]}</p>
+            </div>
+
+            {error && (
+              <p role="alert" className="text-sm font-medium text-danger">
+                {error}
+              </p>
+            )}
+
+            <DialogFooter>
+              <Button variant="outline" onClick={onClose}>
+                Cancel
+              </Button>
+              <Button
+                onClick={() => {
+                  setError(null)
+                  setStep('pin')
+                }}
+                disabled={!detailsReady}
+              >
+                Next: set PIN
+              </Button>
+            </DialogFooter>
+          </div>
+        ) : (
+          <div>
+            <div className="mb-4 text-center">
+              <p className="text-sm font-semibold text-text-primary">{name.trim()}</p>
+              <p className="text-xs text-text-muted">{ROLE_LABELS[role]}</p>
+              <p className="mt-2 text-sm text-text-secondary">
+                {confirming ? 'Enter the same 4 digits again to confirm' : 'Choose their 4-digit PIN'}
+              </p>
+            </div>
+            <div className="flex justify-center">
+              <PinPad
+                key={confirming ? 'confirm' : 'first'}
+                onSubmit={handlePinSubmit}
+                submitting={createOperator.isPending}
+                error={error}
+                onClearError={() => setError(null)}
+              />
+            </div>
+            {createOperator.isPending && (
+              <p className="mt-3 flex items-center justify-center gap-2 text-sm text-text-muted">
+                <Loader2 className="size-3.5 animate-spin" /> Creating
+              </p>
+            )}
+            <Button
+              variant="ghost"
+              size="sm"
+              className="mt-4 w-full"
+              onClick={() => {
+                setPin(null)
+                setConfirming(false)
+                setError(null)
+                setStep('details')
+              }}
+            >
+              Back to details
+            </Button>
+          </div>
+        )}
+      </DialogContent>
+    </Dialog>
   )
 }
 

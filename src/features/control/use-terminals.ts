@@ -77,7 +77,8 @@ export function useUpdateTerminal() {
 
 export interface EmployeeRow {
   member_id: string
-  user_id: string
+  /** Null for PIN-only operators, who have no Supabase account. */
+  user_id: string | null
   display_name: string
   role: MemberRole
   status: string
@@ -102,7 +103,7 @@ export function useEmployees() {
       if (error) throw error
       type Raw = {
         id: string
-        user_id: string
+        user_id: string | null
         role: MemberRole
         status: string
         display_name: string | null
@@ -114,6 +115,7 @@ export function useEmployees() {
         (m): EmployeeRow => ({
           member_id: m.id,
           user_id: m.user_id,
+          // A PIN-only operator has no profile, so display_name is the name.
           display_name: m.display_name ?? m.profiles?.full_name ?? 'Unnamed',
           role: m.role,
           status: m.status,
@@ -151,6 +153,41 @@ export function useSetEmployeePin() {
   })
 }
 
+function invalidateOperatorQueries(qc: ReturnType<typeof useQueryClient>, businessId: string | undefined) {
+  qc.invalidateQueries({ queryKey: ['employees', businessId] })
+  qc.invalidateQueries({ queryKey: ['terminal-employees', businessId] })
+  qc.invalidateQueries({ queryKey: ['approvers', businessId] })
+  qc.invalidateQueries({ queryKey: ['memberships'] })
+}
+
+/**
+ * Creates a PIN-only operator — someone who works this business but has no
+ * Supabase account of their own. Goes through create_operator rather than a
+ * direct insert so the role rules (only an owner can mint an owner) and the
+ * activity record are enforced server-side.
+ */
+export function useCreateOperator() {
+  const { business } = useActiveBusiness()
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (input: { displayName: string; role: MemberRole; pin?: string | null }) => {
+      const { data, error } = await supabase.rpc('create_operator', {
+        p_business_id: business!.id,
+        p_display_name: input.displayName,
+        p_role: input.role,
+        p_pin: input.pin ?? null,
+      })
+      if (error) {
+        console.error('[create_operator] failed', { input: { ...input, pin: undefined }, error })
+        throw error
+      }
+      return data as Database['public']['Tables']['business_members']['Row']
+    },
+    onSuccess: () => invalidateOperatorQueries(qc, business?.id),
+  })
+}
+
 export function useUpdateEmployeeRole() {
   const { business } = useActiveBusiness()
   const qc = useQueryClient()
@@ -162,18 +199,18 @@ export function useUpdateEmployeeRole() {
       display_name?: string
       status?: MemberStatus
     }) => {
-      const { memberId, ...patch } = input
-      const { error } = await supabase
-        .from('business_members')
-        .update(patch)
-        .eq('id', memberId)
-        .eq('business_id', business!.id)
-      if (error) throw error
+      const { error } = await supabase.rpc('update_operator', {
+        p_business_id: business!.id,
+        p_member_id: input.memberId,
+        p_display_name: input.display_name ?? null,
+        p_role: input.role ?? null,
+        p_status: input.status ?? null,
+      })
+      if (error) {
+        console.error('[update_operator] failed', { input, error })
+        throw error
+      }
     },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['employees', business?.id] })
-      qc.invalidateQueries({ queryKey: ['terminal-employees', business?.id] })
-      qc.invalidateQueries({ queryKey: ['memberships'] })
-    },
+    onSuccess: () => invalidateOperatorQueries(qc, business?.id),
   })
 }
