@@ -119,7 +119,7 @@ export function ManagerPinModal({
             {!isLoading && (approvers ?? []).length === 0 && (
               <p className="rounded-lg border border-dashed border-border p-4 text-center text-sm text-text-secondary">
                 No manager or owner has a PIN set up, so this can't be approved at the terminal. Ask
-                an owner to set one in Settings › Employees.
+                an owner to set one on the Operators screen.
               </p>
             )}
             {!isLoading && (approvers ?? []).length > 0 && (

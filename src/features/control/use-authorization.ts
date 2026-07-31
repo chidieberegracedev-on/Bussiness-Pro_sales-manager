@@ -121,7 +121,18 @@ export function useAuthorizationGate() {
   }
 }
 
-/** Managers and owners who can approve an over-limit action. */
+/**
+ * Managers and owners who can approve an over-limit action.
+ *
+ * Reads v_operators, NOT an employee_pins embed. employee_pins carries RLS
+ * `using (false)` so hashes can never be selected by any client — which also
+ * means an embedded join against it comes back empty for everyone, every time.
+ * Filtering on that embed silently produced an empty approver list, so the
+ * manager-PIN modal had nobody to offer and no gated action could be approved.
+ * The view exposes has_pin as a boolean through a SECURITY DEFINER helper;
+ * the hash itself stays unreadable, and a forgotten PIN is reset via
+ * reset_operator_pin — never revealed.
+ */
 export function useApprovers() {
   const { business } = useActiveBusiness()
 
@@ -129,24 +140,28 @@ export function useApprovers() {
     queryKey: ['approvers', business?.id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('business_members')
-        .select('id, role, display_name, profiles(full_name), employee_pins(member_id)')
+        .from('v_operators')
+        .select('member_id, role, display_name, has_pin, locked_until')
         .eq('business_id', business!.id)
         .eq('status', 'active')
         .in('role', ['owner', 'manager'])
       if (error) throw error
       type Raw = {
-        id: string
+        member_id: string
         role: MemberRole
         display_name: string | null
-        profiles: { full_name: string | null } | null
-        employee_pins: { member_id: string }[] | null
+        has_pin: boolean
+        locked_until: string | null
       }
+      const now = Date.now()
       return ((data ?? []) as unknown as Raw[])
-        .filter((m) => (m.employee_pins?.length ?? 0) > 0)
+        .filter((m) => m.has_pin)
+        // A locked-out approver can't approve anything; offering them is a
+        // dead end at exactly the moment somebody is waiting at a till.
+        .filter((m) => !m.locked_until || new Date(m.locked_until).getTime() <= now)
         .map((m) => ({
-          member_id: m.id,
-          display_name: m.display_name ?? m.profiles?.full_name ?? 'Unnamed',
+          member_id: m.member_id,
+          display_name: m.display_name ?? 'Unnamed',
           role: m.role,
         }))
     },
