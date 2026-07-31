@@ -912,6 +912,22 @@ export interface Database {
         }
         Relationships: []
       }
+      v_operators: {
+        Row: {
+          member_id: string
+          business_id: string
+          display_name: string | null
+          role: MemberRole
+          status: MemberStatus
+          /** False for PIN-only operators, who have no Supabase account. */
+          is_account_user: boolean
+          created_at: string
+          /** Whether a PIN exists — the hash itself is never selectable. */
+          has_pin: boolean
+          locked_until: string | null
+        }
+        Relationships: []
+      }
       v_shift_discrepancies: {
         Row: {
           id: string
@@ -1134,6 +1150,14 @@ export interface Database {
       }
       set_employee_pin: {
         Args: { p_business_id: string; p_member_id: string; p_pin: string }
+        Returns: void
+      }
+      operator_has_pin: {
+        Args: { p_member_id: string }
+        Returns: boolean
+      }
+      reset_operator_pin: {
+        Args: { p_business_id: string; p_member_id: string; p_new_pin: string }
         Returns: void
       }
       create_operator: {

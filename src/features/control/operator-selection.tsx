@@ -52,12 +52,7 @@ const ROLE_TINTS: Record<MemberRole, string> = {
  * Employees are operator records inside the business — they never have their own
  * email or password, and never touch the owner's.
  */
-export function OperatorSelectionScreen({
-  onBootstrap,
-}: {
-  /** Escape hatch used only when no operator has a PIN yet. */
-  onBootstrap?: () => void
-}) {
+export function OperatorSelectionScreen() {
   const { business } = useActiveBusiness()
   const context = useEmployeeSessionStore((s) => s.context)
   const clear = useEmployeeSessionStore((s) => s.clear)
@@ -209,40 +204,45 @@ export function OperatorSelectionScreen({
 
               {!isLoading && ordered.length > 0 && (
                 <ul className="space-y-2">
-                  {ordered.map((member) => (
-                    <li key={member.member_id}>
-                      <button
-                        type="button"
-                        onClick={() => member.has_pin && setSelected(member)}
-                        disabled={!member.has_pin || !terminalId}
-                        className={cn(
-                          'flex w-full items-center gap-3 rounded-lg border border-border p-3 text-left transition-colors',
-                          member.has_pin && terminalId
-                            ? 'hover:bg-surface-muted'
-                            : 'cursor-not-allowed opacity-55',
-                        )}
-                      >
-                        <OperatorAvatar name={member.display_name} role={member.role} />
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm font-medium text-text-primary">
-                            {member.display_name}
-                          </span>
-                          <span className="block text-xs text-text-muted">
-                            {ROLE_LABELS[member.role]}
-                          </span>
-                        </span>
-                        <span className="shrink-0 text-xs text-text-muted">
-                          {member.has_pin ? (
-                            <span className="inline-flex items-center gap-1">
-                              <KeyRound className="size-3" /> PIN required
-                            </span>
-                          ) : (
-                            'No PIN set'
+                  {ordered.map((member) => {
+                    const locked =
+                      !!member.locked_until && new Date(member.locked_until) > new Date()
+                    const selectable = member.has_pin && !!terminalId && !locked
+                    return (
+                      <li key={member.member_id}>
+                        <button
+                          type="button"
+                          onClick={() => selectable && setSelected(member)}
+                          disabled={!selectable}
+                          className={cn(
+                            'flex w-full items-center gap-3 rounded-lg border border-border p-3 text-left transition-colors',
+                            selectable ? 'hover:bg-surface-muted' : 'cursor-not-allowed opacity-55',
                           )}
-                        </span>
-                      </button>
-                    </li>
-                  ))}
+                        >
+                          <OperatorAvatar name={member.display_name} role={member.role} />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm font-medium text-text-primary">
+                              {member.display_name}
+                            </span>
+                            <span className="block text-xs text-text-muted">
+                              {ROLE_LABELS[member.role]}
+                            </span>
+                          </span>
+                          <span className="shrink-0 text-xs text-text-muted">
+                            {locked ? (
+                              <span className="font-medium text-danger">Locked</span>
+                            ) : member.has_pin ? (
+                              <span className="inline-flex items-center gap-1">
+                                <KeyRound className="size-3" /> PIN required
+                              </span>
+                            ) : (
+                              'No PIN set'
+                            )}
+                          </span>
+                        </button>
+                      </li>
+                    )
+                  })}
                 </ul>
               )}
 
@@ -252,19 +252,13 @@ export function OperatorSelectionScreen({
                 </p>
               )}
 
-              {/* Bootstrap: a brand-new business has no PINs, so the account
-                  holder must be able to get in and set them up. */}
-              {!isLoading && !anyPins && onBootstrap && (
-                <div className="mt-4 rounded-lg border border-dashed border-border p-4">
-                  <p className="text-sm font-medium text-text-primary">Nobody has a PIN yet</p>
-                  <p className="mt-1 text-sm text-text-secondary">
-                    Continue as the account holder to set operator PINs, then everyone signs in here
-                    with a PIN instead.
-                  </p>
-                  <Button size="sm" className="mt-3 w-full" onClick={onBootstrap}>
-                    Continue to setup
-                  </Button>
-                </div>
+              {/* Everyone is listed, but nobody can get in — say who can fix it
+                  rather than leaving a dead screen. */}
+              {!isLoading && ordered.length > 0 && !anyPins && (
+                <p className="mt-4 rounded-lg border border-dashed border-border p-3 text-sm text-text-secondary">
+                  Nobody has a PIN yet. An owner signed in with the business email can set PINs from
+                  the Operators screen.
+                </p>
               )}
             </>
           )}

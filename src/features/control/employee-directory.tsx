@@ -26,14 +26,13 @@ import { TableSkeleton } from '@/components/data/loading-state'
 import { PinPad } from '@/features/control/pin-pad'
 import {
   useEmployees,
-  useSetEmployeePin,
   useUpdateEmployeeRole,
   useCreateOperator,
+  useResetOperatorPin,
   type EmployeeRow,
 } from '@/features/control/use-terminals'
 import { ROLE_DESCRIPTIONS, ROLE_LABELS } from '@/features/control/roles'
 import { useActiveBusiness } from '@/features/business/hooks'
-import { useAuthStore } from '@/features/auth/store'
 import { useLocale } from '@/features/auth/use-locale'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { formatDate, formatDateTime } from '@/lib/format'
@@ -50,9 +49,9 @@ const ASSIGNABLE_ROLES: MemberRole[] = ['owner', 'manager', 'inventory_staff', '
  * lists, so an empty directory means an empty lock screen.
  */
 export function EmployeeDirectoryPage() {
-  const { business, role: myRole } = useActiveBusiness()
+  const { business, role: myRole, membership } = useActiveBusiness()
   const locale = useLocale()
-  const myUserId = useAuthStore((s) => s.user?.id)
+  const myMemberId = membership?.id
   const isOwner = myRole === 'owner'
 
   const { data: employees, isLoading, isError, refetch } = useEmployees()
@@ -82,9 +81,10 @@ export function EmployeeDirectoryPage() {
   )
 
   // The signed-in account holder's own operator record — they need a PIN too.
+  // membership.id IS their business_members id, so no user_id lookup is needed.
   const myMembership = useMemo(
-    () => (employees ?? []).find((e) => e.user_id === myUserId),
-    [employees, myUserId],
+    () => (employees ?? []).find((e) => e.member_id === myMemberId),
+    [employees, myMemberId],
   )
 
   async function patch(values: Parameters<typeof updateEmployee.mutateAsync>[0]) {
@@ -549,10 +549,17 @@ function RenameDialog({
   )
 }
 
+/**
+ * Sets or resets an operator's PIN. Uses reset_operator_pin either way — it
+ * upserts, clears any failed-attempt lockout, and enforces that only an owner
+ * can reset an owner's PIN.
+ */
 function SetPinDialog({ employee, onClose }: { employee: EmployeeRow; onClose: () => void }) {
-  const setPin = useSetEmployeePin()
+  const resetPin = useResetOperatorPin()
   const [firstEntry, setFirstEntry] = useState<string | null>(null)
   const [error, setError] = useState<string | null>(null)
+
+  const locked = !!employee.pin_locked_until && new Date(employee.pin_locked_until) > new Date()
 
   function handleSubmit(pin: string) {
     setError(null)
@@ -565,13 +572,13 @@ function SetPinDialog({ employee, onClose }: { employee: EmployeeRow; onClose: (
       setError("Those PINs didn't match. Start again.")
       return
     }
-    setPin.mutate(
-      { memberId: employee.member_id, pin },
+    resetPin.mutate(
+      { memberId: employee.member_id, newPin: pin },
       {
         onSuccess: () => {
           toast({
-            title: 'PIN set',
-            description: `${employee.display_name} can now sign in at a terminal.`,
+            title: employee.has_pin ? 'PIN reset' : 'PIN set',
+            description: `${employee.display_name} can sign in at a terminal now.`,
           })
           onClose()
         },
@@ -592,6 +599,18 @@ function SetPinDialog({ employee, onClose }: { employee: EmployeeRow; onClose: (
           </DialogTitle>
         </DialogHeader>
         <div>
+          {locked && (
+            <p className="mb-3 rounded-md border border-danger/30 bg-danger/5 p-2.5 text-sm text-text-secondary">
+              This operator is locked out from too many wrong attempts. Setting a new PIN clears the
+              lockout immediately.
+            </p>
+          )}
+          {employee.has_pin && !locked && (
+            <p className="mb-3 rounded-md border border-border bg-surface-muted/50 p-2.5 text-sm text-text-secondary">
+              The old PIN stops working as soon as this is saved. Nobody can read the previous one —
+              it can only be replaced.
+            </p>
+          )}
           <p className="mb-4 text-center text-sm text-text-secondary">
             {firstEntry ? 'Enter the same 4 digits again to confirm' : 'Choose a 4-digit PIN'}
           </p>
@@ -599,12 +618,12 @@ function SetPinDialog({ employee, onClose }: { employee: EmployeeRow; onClose: (
             <PinPad
               key={firstEntry ? 'confirm' : 'first'}
               onSubmit={handleSubmit}
-              submitting={setPin.isPending}
+              submitting={resetPin.isPending}
               error={error}
               onClearError={() => setError(null)}
             />
           </div>
-          {setPin.isPending && (
+          {resetPin.isPending && (
             <p className="mt-3 flex items-center justify-center gap-2 text-sm text-text-muted">
               <Loader2 className="size-3.5 animate-spin" /> Saving
             </p>

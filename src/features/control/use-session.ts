@@ -14,6 +14,7 @@ export interface EmployeeOption {
   display_name: string
   role: MemberRole
   has_pin: boolean
+  locked_until: string | null
 }
 
 /**
@@ -27,26 +28,28 @@ export function useTerminalEmployees() {
   return useQuery({
     queryKey: ['terminal-employees', business?.id],
     queryFn: async () => {
+      // v_operators exposes has_pin as a boolean; employee_pins itself is
+      // unreadable by design, so querying it directly always reads as "no PIN".
       const { data, error } = await supabase
-        .from('business_members')
-        .select('id, role, display_name, profiles(full_name), employee_pins(member_id)')
+        .from('v_operators')
+        .select('member_id, role, display_name, has_pin, locked_until')
         .eq('business_id', business!.id)
         .eq('status', 'active')
-        .order('role', { ascending: true })
       if (error) throw error
       type Raw = {
-        id: string
+        member_id: string
         role: MemberRole
         display_name: string | null
-        profiles: { full_name: string | null } | null
-        employee_pins: { member_id: string }[] | null
+        has_pin: boolean
+        locked_until: string | null
       }
-      return ((data ?? []) as unknown as Raw[]).map(
+      return ((data ?? []) as Raw[]).map(
         (m): EmployeeOption => ({
-          member_id: m.id,
-          display_name: m.display_name ?? m.profiles?.full_name ?? 'Unnamed',
+          member_id: m.member_id,
+          display_name: m.display_name ?? 'Unnamed',
           role: m.role,
-          has_pin: (m.employee_pins?.length ?? 0) > 0,
+          has_pin: m.has_pin,
+          locked_until: m.locked_until,
         }),
       )
     },

@@ -77,8 +77,8 @@ export function useUpdateTerminal() {
 
 export interface EmployeeRow {
   member_id: string
-  /** Null for PIN-only operators, who have no Supabase account. */
-  user_id: string | null
+  /** False for PIN-only operators, who have no Supabase account. */
+  is_account_user: boolean
   display_name: string
   role: MemberRole
   status: string
@@ -87,6 +87,14 @@ export interface EmployeeRow {
   created_at: string
 }
 
+/**
+ * Reads v_operators rather than business_members.
+ *
+ * employee_pins is deliberately unreadable (RLS `using (false)`) so hashes can
+ * never leak — which also means an embedded select against it always comes back
+ * empty, and every operator reads as "No PIN". The view exposes has_pin as a
+ * boolean without ever exposing the hash (0016).
+ */
 export function useEmployees() {
   const { business } = useActiveBusiness()
 
@@ -94,33 +102,21 @@ export function useEmployees() {
     queryKey: ['employees', business?.id],
     queryFn: async () => {
       const { data, error } = await supabase
-        .from('business_members')
-        .select(
-          'id, user_id, role, status, display_name, created_at, profiles(full_name), employee_pins(member_id, locked_until)',
-        )
+        .from('v_operators')
+        .select('*')
         .eq('business_id', business!.id)
         .order('created_at', { ascending: true })
       if (error) throw error
-      type Raw = {
-        id: string
-        user_id: string | null
-        role: MemberRole
-        status: string
-        display_name: string | null
-        created_at: string
-        profiles: { full_name: string | null } | null
-        employee_pins: { member_id: string; locked_until: string | null }[] | null
-      }
-      return ((data ?? []) as unknown as Raw[]).map(
+      type Raw = Database['public']['Views']['v_operators']['Row']
+      return ((data ?? []) as Raw[]).map(
         (m): EmployeeRow => ({
-          member_id: m.id,
-          user_id: m.user_id,
-          // A PIN-only operator has no profile, so display_name is the name.
-          display_name: m.display_name ?? m.profiles?.full_name ?? 'Unnamed',
+          member_id: m.member_id,
+          is_account_user: m.is_account_user,
+          display_name: m.display_name ?? 'Unnamed',
           role: m.role,
           status: m.status,
-          has_pin: (m.employee_pins?.length ?? 0) > 0,
-          pin_locked_until: m.employee_pins?.[0]?.locked_until ?? null,
+          has_pin: m.has_pin,
+          pin_locked_until: m.locked_until,
           created_at: m.created_at,
         }),
       )
@@ -129,31 +125,10 @@ export function useEmployees() {
   })
 }
 
-export function useSetEmployeePin() {
-  const { business } = useActiveBusiness()
-  const qc = useQueryClient()
-
-  return useMutation({
-    mutationFn: async (input: { memberId: string; pin: string }) => {
-      const { error } = await supabase.rpc('set_employee_pin', {
-        p_business_id: business!.id,
-        p_member_id: input.memberId,
-        p_pin: input.pin,
-      })
-      if (error) {
-        console.error('[set_employee_pin] failed', error)
-        throw error
-      }
-    },
-    onSuccess: () => {
-      qc.invalidateQueries({ queryKey: ['employees', business?.id] })
-      qc.invalidateQueries({ queryKey: ['terminal-employees', business?.id] })
-      qc.invalidateQueries({ queryKey: ['approvers', business?.id] })
-    },
-  })
-}
-
-function invalidateOperatorQueries(qc: ReturnType<typeof useQueryClient>, businessId: string | undefined) {
+function invalidateOperatorQueries(
+  qc: ReturnType<typeof useQueryClient>,
+  businessId: string | undefined,
+) {
   qc.invalidateQueries({ queryKey: ['employees', businessId] })
   qc.invalidateQueries({ queryKey: ['terminal-employees', businessId] })
   qc.invalidateQueries({ queryKey: ['approvers', businessId] })
@@ -183,6 +158,32 @@ export function useCreateOperator() {
         throw error
       }
       return data as Database['public']['Tables']['business_members']['Row']
+    },
+    onSuccess: () => invalidateOperatorQueries(qc, business?.id),
+  })
+}
+
+/**
+ * Owner/manager PIN reset. The business is authenticated by the Supabase login,
+ * so control of that login IS the recovery channel — an authenticated owner can
+ * reset anyone's PIN, including their own. A locked-out owner recovers through
+ * the normal Supabase email password reset, then resets their PIN from inside.
+ */
+export function useResetOperatorPin() {
+  const { business } = useActiveBusiness()
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (input: { memberId: string; newPin: string }) => {
+      const { error } = await supabase.rpc('reset_operator_pin', {
+        p_business_id: business!.id,
+        p_member_id: input.memberId,
+        p_new_pin: input.newPin,
+      })
+      if (error) {
+        console.error('[reset_operator_pin] failed', { memberId: input.memberId, error })
+        throw error
+      }
     },
     onSuccess: () => invalidateOperatorQueries(qc, business?.id),
   })

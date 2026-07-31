@@ -3,6 +3,7 @@ import { Navigate, Outlet } from 'react-router-dom'
 import { useEmployeeSessionStore } from '@/features/control/session-store'
 import { useRestoreSession, useAutoLock, useTerminalEmployees } from '@/features/control/use-session'
 import { OperatorSelectionScreen } from '@/features/control/operator-selection'
+import { OwnerPinSetupScreen } from '@/features/control/owner-pin-setup'
 import { RegistryWorkspace } from '@/features/control/registry-workspace'
 import { FullPageLoading } from '@/components/layout/full-page-loading'
 import { PermissionDeniedState } from '@/components/data/error-state'
@@ -48,32 +49,49 @@ export function WorkspaceGate() {
   const bootstrapping = useBootstrapStore((s) => s.bootstrapping)
   const setBootstrapping = useBootstrapStore((s) => s.setBootstrapping)
 
-  const { data: members, isLoading: membersLoading } = useTerminalEmployees()
+  const { data: members, isLoading: membersLoading, refetch } = useTerminalEmployees()
+  const { role: deviceRole } = useActiveBusiness()
 
   useAutoLock(!!context && context.status === 'active')
 
   // A stored token still resolving — don't flash the operator screen.
   if (token && !context && !restored) return <FullPageLoading />
 
+  // An operator has passed the PIN gate: their role decides the workspace.
   if (context?.status === 'active') {
-    // Cashiers get the Registry and nothing else.
     if (context.role === 'cashier') return <RegistryWorkspace />
     return <Outlet />
   }
 
-  // Locked session, or no session at all: the operator screen handles both.
+  // A locked session resumes as the same operator.
   if (context?.status === 'locked') return <OperatorSelectionScreen />
 
   if (membersLoading) return <FullPageLoading />
 
   const anyPins = (members ?? []).some((m) => m.has_pin)
 
-  // Once PINs exist, bootstrap is over — everyone signs in as an operator.
-  if (anyPins && bootstrapping) setBootstrapping(false)
+  // Fresh business: nobody has a PIN, so the gate would be unpassable. Let the
+  // account holder set theirs first — this is the only way past without a PIN.
+  if (!anyPins) {
+    if (deviceRole === 'owner' || deviceRole === 'manager') {
+      return (
+        <OwnerPinSetupScreen
+          onDone={() => {
+            setBootstrapping(false)
+            refetch()
+          }}
+        />
+      )
+    }
+    // No PINs and no authority to create one — nothing useful to show.
+    return <OperatorSelectionScreen />
+  }
 
-  if (!anyPins && bootstrapping) return <Outlet />
+  // PINs exist, so bootstrap is over for good: everyone signs in as an operator,
+  // the owner included.
+  if (bootstrapping) setBootstrapping(false)
 
-  return <OperatorSelectionScreen onBootstrap={() => setBootstrapping(true)} />
+  return <OperatorSelectionScreen />
 }
 
 /**
