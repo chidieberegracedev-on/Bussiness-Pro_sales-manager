@@ -1,12 +1,19 @@
 import Decimal from 'decimal.js'
 import { useQuery } from '@tanstack/react-query'
-import { CheckCircle2 } from 'lucide-react'
+import { useState } from 'react'
+import { CheckCircle2, Printer, Loader2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Money } from '@/components/money/money'
 import { Quantity } from '@/components/quantity/quantity'
 import { Separator } from '@/components/ui/separator'
 import { DialogHeader, DialogTitle } from '@/components/ui/dialog'
+import { useQueueReceipt } from '@/features/print/use-receipt'
+import { useActiveBusiness } from '@/features/business/hooks'
+import { useLocale } from '@/features/auth/use-locale'
+import { formatMoney } from '@/lib/money'
+import { toast } from '@/hooks/use-toast'
+import { toReadableError } from '@/lib/errors'
 import type { Database, PaymentMethod } from '@/types/database'
 
 type CompletedSale = Database['public']['Tables']['sales']['Row']
@@ -45,6 +52,48 @@ export function SaleConfirmation({
   onNewSale: () => void
 }) {
   const { data: items } = useSaleItems(sale.id)
+  const { business } = useActiveBusiness()
+  const locale = useLocale()
+  const queueReceipt = useQueueReceipt()
+  const [queueing, setQueueing] = useState(false)
+
+  async function printReceipt() {
+    if (!business || !items) return
+    setQueueing(true)
+    try {
+      const money = (v: string | number) =>
+        formatMoney(v, business.currency_code, business.currency_exponent, locale)
+      await queueReceipt({
+        saleId: sale.id,
+        saleNumber: sale.sale_number,
+        occurredAt: sale.created_at,
+        lines: items.map((item) => ({
+          name: item.variant_name
+            ? `${item.product_name} · ${item.variant_name}`
+            : item.product_name,
+          qty: item.quantity,
+          amount: money(item.line_total),
+        })),
+        subtotal: money(sale.subtotal ?? sale.grand_total),
+        total: money(sale.grand_total),
+        changeDue: changeDue && changeDue.gt(0) ? changeDue : null,
+        fallbackMethod: paymentMethod,
+      })
+      toast({
+        title: 'Receipt queued',
+        description: 'Print it now from Settings › Printing, or hand the customer the QR.',
+      })
+    } catch (error) {
+      toast({
+        variant: 'destructive',
+        title: "Couldn't queue the receipt",
+        description: toReadableError(error),
+      })
+    } finally {
+      setQueueing(false)
+    }
+  }
+
   // Recomputed against the server's authoritative grand_total, not the
   // client's pre-submission cart subtotal — the price read at completion
   // may differ from what was shown while building the cart (BR-S1.4).
@@ -94,9 +143,15 @@ export function SaleConfirmation({
 
         <Separator />
 
-        <Button className="w-full" size="lg" onClick={onNewSale}>
-          New sale
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" className="flex-1" size="lg" onClick={printReceipt} disabled={queueing}>
+            {queueing ? <Loader2 className="size-4 animate-spin" /> : <Printer className="size-4" />}
+            Receipt
+          </Button>
+          <Button className="flex-1" size="lg" onClick={onNewSale}>
+            New sale
+          </Button>
+        </div>
       </div>
     </>
   )

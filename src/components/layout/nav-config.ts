@@ -26,6 +26,7 @@ import {
   Users,
   Scale,
   ShieldQuestion,
+  ClipboardList,
 } from 'lucide-react'
 import type { MemberRole } from '@/types/database'
 
@@ -53,6 +54,7 @@ export const NAV_ITEMS: NavItem[] = [
     children: [
       { label: 'Low stock', to: '/inventory/low-stock', icon: AlertTriangle },
       { label: 'Stock movements', to: '/inventory/movements', icon: History, roles: BACKROOM },
+      { label: 'Stock counts', to: '/inventory/counts', icon: ClipboardList, roles: BACKROOM },
     ],
   },
   {

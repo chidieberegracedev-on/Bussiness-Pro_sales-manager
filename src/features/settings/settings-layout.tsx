@@ -10,6 +10,7 @@ const TABS: { to: string; label: string; roles: MemberRole[] }[] = [
   { to: '/settings/business', label: 'Business', roles: ['owner', 'manager'] },
   { to: '/settings/categories', label: 'Categories', roles: ['owner', 'manager'] },
   { to: '/settings/terminals', label: 'Terminals', roles: ['owner', 'manager'] },
+  { to: '/settings/printing', label: 'Printing & scanning', roles: ['owner', 'manager'] },
   { to: '/settings/permissions', label: 'Permissions', roles: ['owner', 'manager'] },
   { to: '/settings/appearance', label: 'Appearance', roles: ALL_ROLES },
 ]

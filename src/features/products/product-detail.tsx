@@ -4,6 +4,7 @@ import { useProductDetail, useToggleProductActive } from '@/features/products/us
 import { useRecentMovements } from '@/features/inventory/use-movements'
 import { useStockDialogStore } from '@/features/inventory/stock-dialog-store'
 import { variantLabel } from '@/features/products/types'
+import { BarcodeManager } from '@/features/scan/barcode-manager'
 import { useActiveBusiness } from '@/features/business/hooks'
 import { useCategories } from '@/features/products/categories-hooks'
 import { PRODUCT_IMAGE_BUCKET } from '@/lib/storage-buckets'
@@ -131,6 +132,23 @@ export function ProductDetailPage() {
               </p>
               <p className="mt-1 text-lg font-semibold"><Money value={variants[0].stock_value} /></p>
             </div>
+          </CardContent>
+        </Card>
+      )}
+
+      {/* Barcodes are per-variant, so a simple product gets the manager inline
+          and a variant product manages codes from each variant row. */}
+      {isSimple && variants && variants.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Barcodes</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <BarcodeManager
+              variantId={variants[0].variant_id}
+              baseUnit={product.base_unit}
+              primaryBarcode={variants[0].barcode}
+            />
           </CardContent>
         </Card>
       )}

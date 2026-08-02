@@ -7,12 +7,16 @@ import { PaymentDialog } from '@/features/pos/payment-dialog'
 import { Button } from '@/components/ui/button'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Money } from '@/components/money/money'
+import { useScanToBasket } from '@/features/scan/use-scan-to-basket'
+import { ScanStrip } from '@/features/scan/scan-strip'
 
 export function PosPage() {
   const lines = useCartStore((s) => s.lines)
   const [mobileCartOpen, setMobileCartOpen] = useState(false)
   const [paymentOpen, setPaymentOpen] = useState(false)
   const subtotal = cartSubtotal(lines)
+  // The POS is a client of the Scan Engine, not an owner of scan logic.
+  const { feedback } = useScanToBasket(!paymentOpen)
 
   function handleTakePayment() {
     setMobileCartOpen(false)
@@ -21,8 +25,11 @@ export function PosPage() {
 
   return (
     <div className="flex h-[calc(100dvh-4rem)] flex-col gap-4 lg:h-[calc(100dvh-6rem)] lg:flex-row">
-      <div className="min-h-0 flex-1 lg:flex-[2]">
-        <ProductPicker />
+      <div className="flex min-h-0 flex-1 flex-col gap-3 lg:flex-[2]">
+        <ScanStrip feedback={feedback} />
+        <div className="min-h-0 flex-1">
+          <ProductPicker />
+        </div>
       </div>
 
       {/* Desktop: persistent cart pane */}

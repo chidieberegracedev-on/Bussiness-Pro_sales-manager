@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react'
+import { useCallback, useMemo, useState } from 'react'
 import { useNavigate, useParams } from 'react-router-dom'
 import {
   ArrowLeft,
@@ -56,6 +56,12 @@ const REASON_LABELS: Record<ReceiptDiscrepancy, string> = {
   other: 'Other',
 }
 
+import { useBarcodeResolver, unitsPerScan, resolvedLabel } from '@/features/scan/barcode-resolver'
+import { useExclusiveScanSubscription } from '@/features/scan/scan-engine'
+import { ScanStrip } from '@/features/scan/scan-strip'
+import type { ScanFeedback } from '@/features/scan/use-scan-to-basket'
+import { LabelSuggestionDialog, type LabelSuggestion } from '@/features/print/label-automation'
+
 export function ReceiveGoodsPage() {
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
@@ -68,6 +74,10 @@ export function ReceiveGoodsPage() {
   const [receiptId] = useState(() => crypto.randomUUID())
   const [drafts, setDrafts] = useState<Record<string, LineDraft>>({})
   const [note, setNote] = useState('')
+  const [scanFeedback, setScanFeedback] = useState<ScanFeedback | null>(null)
+  const [labelPrompt, setLabelPrompt] = useState<LabelSuggestion[] | null>(null)
+  const [pendingNavigation, setPendingNavigation] = useState<string | null>(null)
+  const resolve = useBarcodeResolver()
 
   const openLines = useMemo(
     () => (data?.items ?? []).filter((i) => i.status !== 'complete'),
@@ -100,6 +110,78 @@ export function ReceiveGoodsPage() {
   function updateDraft(poItemId: string, patch: Partial<LineDraft>) {
     setDrafts((prev) => ({ ...prev, [poItemId]: { ...prev[poItemId], ...patch } }))
   }
+
+  /**
+   * Scanning at receiving — the second client of the Scan Engine.
+   *
+   * The resolver returns units in BASE terms; this screen works in PURCHASE
+   * units. So a scan adds `units_per_scan / conversion_to_base` purchase units:
+   * a carton code on a carton-ordered line adds exactly one carton, and a piece
+   * code on that same line adds a twelfth of one. That division is the whole
+   * reason the resolver carries unit context — receive_goods still divides cost
+   * by the conversion afterwards, so the per-base cost invariant is untouched.
+   */
+  const handleScan = useCallback(
+    async (code: string) => {
+      const resolved = await resolve(code)
+      if (!resolved.found) {
+        setScanFeedback({ ok: false, label: code, detail: 'Not linked to any product' })
+        return
+      }
+      const line = (data?.items ?? []).find(
+        (i) => i.variant_id === resolved.variant_id && i.status !== 'complete',
+      )
+      if (!line) {
+        setScanFeedback({
+          ok: false,
+          label: resolvedLabel(resolved),
+          detail: 'Not an open line on this order',
+        })
+        return
+      }
+
+      const conversion = new Decimal(line.conversion_to_base)
+      const addPurchase = conversion.gt(0)
+        ? new Decimal(unitsPerScan(resolved)).div(conversion)
+        : new Decimal(1)
+
+      setDrafts((prev) => {
+        const current = prev[line.id]
+        const base: LineDraft = current ?? {
+          poItemId: line.id,
+          movementId: crypto.randomUUID(),
+          qtyReceivedPurchase: '',
+          qtyGoodPurchase: '',
+          qtyDamagedBase: '',
+          qtyDiscrepancyBase: '',
+          reason: 'none',
+          unitCostPurchase: line.expected_unit_cost || '',
+          note: '',
+        }
+        // A scan counts what physically arrived, so it drives received AND good
+        // together; damage is still recorded by hand on the line.
+        const nextReceived = new Decimal(base.qtyReceivedPurchase || '0').plus(addPurchase)
+        const nextGood = new Decimal(base.qtyGoodPurchase || '0').plus(addPurchase)
+        return {
+          ...prev,
+          [line.id]: {
+            ...base,
+            qtyReceivedPurchase: nextReceived.toString(),
+            qtyGoodPurchase: nextGood.toString(),
+          },
+        }
+      })
+
+      setScanFeedback({
+        ok: true,
+        label: resolvedLabel(resolved),
+        detail: `+${addPurchase.toString()} ${line.purchase_unit}`,
+      })
+    },
+    [resolve, data?.items],
+  )
+
+  useExclusiveScanSubscription((event) => void handleScan(event.code), canReceive)
 
   const linesToSubmit = useMemo(() => {
     return Object.values(drafts).filter((d) => {
@@ -136,6 +218,34 @@ export function ReceiveGoodsPage() {
         title: 'Goods received',
         description: `Recorded ${linesToSubmit.length} line${linesToSubmit.length === 1 ? '' : 's'}`,
       })
+
+      // Event-driven label automation: goods arriving is the one moment
+      // printing labels is obviously worth doing, so ask now rather than
+      // hoping someone remembers later. Always asks — never queues silently.
+      const suggestions: LabelSuggestion[] = linesToSubmit
+        .map((d): LabelSuggestion | null => {
+          const line = (data.items ?? []).find((i) => i.id === d.poItemId)
+          if (!line) return null
+          const good = new Decimal(d.qtyGoodPurchase || d.qtyReceivedPurchase || '0')
+          const baseUnits = good.times(line.conversion_to_base)
+          if (baseUnits.lte(0)) return null
+          return {
+            productName: line.product_name,
+            variantName: null,
+            price: null,
+            code: null,
+            sku: null,
+            quantity: Math.min(Math.round(baseUnits.toNumber()), 500),
+          }
+        })
+        .filter((s): s is LabelSuggestion => s !== null)
+
+      if (suggestions.length > 0) {
+        setLabelPrompt(suggestions)
+        setPendingNavigation(`/purchase-orders/${data.order.id}`)
+        return
+      }
+
       navigate(`/purchase-orders/${data.order.id}`, {
         replace: true,
         state: { receiptId: receipt.id },
@@ -221,6 +331,24 @@ export function ReceiveGoodsPage() {
           </div>
         </CardContent>
       </Card>
+
+      {/* Scanning is the fast path here: check goods off the order by pointing
+          a scanner at them instead of typing every line. */}
+      {openLines.length > 0 && canReceive && (
+        <ScanStrip feedback={scanFeedback} className="mb-4" />
+      )}
+
+      {labelPrompt && (
+        <LabelSuggestionDialog
+          title="Print labels for what arrived?"
+          description="New stock usually needs a shelf or product label. Adjust the counts or skip — nothing prints until you send it to a device."
+          suggestions={labelPrompt}
+          onClose={() => {
+            setLabelPrompt(null)
+            if (pendingNavigation) navigate(pendingNavigation, { replace: true })
+          }}
+        />
+      )}
 
       {openLines.length === 0 ? (
         <Card>

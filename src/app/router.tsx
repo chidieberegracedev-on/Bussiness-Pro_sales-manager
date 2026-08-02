@@ -44,6 +44,9 @@ import { DictionaryPage } from '@/features/help/dictionary-page'
 import { CalculatorPage } from '@/features/help/calculator-page'
 import { LearningCenterPage } from '@/features/help/learning-page'
 import { SettingsTerminalsPage } from '@/features/control/settings-terminals'
+import { CountSessionsPage } from '@/features/counting/count-sessions-page'
+import { CountSessionPage } from '@/features/counting/count-session-page'
+import { PrintQueuePage } from '@/features/print/print-queue-page'
 import { EmployeeDirectoryPage } from '@/features/control/employee-directory'
 import { SettingsPermissionsPage } from '@/features/control/settings-permissions'
 import { LiveShiftsPage } from '@/features/control/live-shifts-page'
@@ -98,6 +101,9 @@ export function AppRouter() {
               <Route path="/products/:id/edit" element={<EditProductPage />} />
               <Route path="/inventory/movements" element={<MovementHistoryPage />} />
               <Route path="/inventory/movements/:variantId" element={<MovementHistoryPage />} />
+              {/* Counting is backroom work — same roles as the rest of it. */}
+              <Route path="/inventory/counts" element={<CountSessionsPage />} />
+              <Route path="/inventory/counts/:id" element={<CountSessionPage />} />
             </Route>
 
             <Route path="/inventory/low-stock" element={<LowStockPage />} />
@@ -159,6 +165,7 @@ export function AppRouter() {
                 <Route path="categories" element={<SettingsCategoriesPage />} />
                 <Route path="employees" element={<Navigate to="/employees" replace />} />
                 <Route path="terminals" element={<SettingsTerminalsPage />} />
+                <Route path="printing" element={<PrintQueuePage />} />
                 <Route path="permissions" element={<SettingsPermissionsPage />} />
               </Route>
             </Route>

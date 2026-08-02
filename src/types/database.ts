@@ -69,6 +69,92 @@ export type InsightCategory = 'sales' | 'expenses' | 'margin' | 'stock' | 'cash'
 export interface Database {
   public: {
     Tables: {
+      product_barcodes: {
+        Row: {
+          id: string
+          business_id: string
+          variant_id: string
+          code: string
+          kind: BarcodeKind
+          /** Base units one scan of this code represents. >1 for cartons. */
+          units_per_scan: string
+          is_primary: boolean
+          created_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['product_barcodes']['Row']> & {
+          business_id: string
+          variant_id: string
+          code: string
+        }
+        Update: Partial<Database['public']['Tables']['product_barcodes']['Row']>
+        Relationships: []
+      }
+      inventory_count_sessions: {
+        Row: {
+          id: string
+          business_id: string
+          location_id: string
+          mode: CountMode
+          status: CountStatus
+          is_blind: boolean
+          filter: JsonB
+          opened_by: string | null
+          opened_at: string
+          approved_by: string | null
+          approved_at: string | null
+          note: string | null
+        }
+        Insert: Partial<Database['public']['Tables']['inventory_count_sessions']['Row']> & {
+          id: string
+          business_id: string
+          location_id: string
+        }
+        Update: Partial<Database['public']['Tables']['inventory_count_sessions']['Row']>
+        Relationships: []
+      }
+      inventory_count_items: {
+        Row: {
+          id: string
+          session_id: string
+          business_id: string
+          variant_id: string
+          location_id: string
+          /** Frozen at session open — never re-read from live inventory. */
+          expected_qty: string
+          counted_qty: string | null
+          avg_cost_snapshot: string
+          created_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['inventory_count_items']['Row']> & {
+          session_id: string
+          business_id: string
+          variant_id: string
+          location_id: string
+          expected_qty: string
+        }
+        Update: Partial<Database['public']['Tables']['inventory_count_items']['Row']>
+        Relationships: []
+      }
+      print_jobs: {
+        Row: {
+          id: string
+          business_id: string
+          terminal_id: string | null
+          job_type: PrintJobType
+          status: PrintJobStatus
+          payload: JsonB
+          copies: number
+          requested_by: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['print_jobs']['Row']> & {
+          business_id: string
+          job_type: PrintJobType
+        }
+        Update: Partial<Database['public']['Tables']['print_jobs']['Row']>
+        Relationships: []
+      }
       profiles: {
         Row: {
           id: string
@@ -960,6 +1046,38 @@ export interface Database {
       }
     }
     Functions: {
+      resolve_barcode: {
+        Args: { p_business_id: string; p_code: string }
+        Returns: ResolvedBarcode
+      }
+      open_count_session: {
+        Args: {
+          p_session_id: string
+          p_business_id: string
+          p_location_id: string
+          p_mode?: CountMode
+          p_is_blind?: boolean
+          p_variant_ids?: string[] | null
+        }
+        Returns: Database['public']['Tables']['inventory_count_sessions']['Row']
+      }
+      record_count: {
+        Args: { p_session_id: string; p_variant_id: string; p_counted_qty: number }
+        Returns: void
+      }
+      approve_count_session: {
+        Args: {
+          p_session_id: string
+          p_approver_member_id: string
+          p_approver_pin: string
+          p_actor_token?: string | null
+        }
+        Returns: CountApprovalResult
+      }
+      cancel_count_session: {
+        Args: { p_session_id: string }
+        Returns: Database['public']['Tables']['inventory_count_sessions']['Row']
+      }
       create_business: {
         Args: {
           p_name: string
@@ -1304,3 +1422,83 @@ export interface AuthorizationGrant {
 }
 
 type JsonB = Record<string, unknown>
+
+// ---------------------------------------------------------------------------
+// Phase 10 — scan & print (0022 / 0023)
+// ---------------------------------------------------------------------------
+export type BarcodeKind =
+  | 'manufacturer'
+  | 'internal'
+  | 'carton'
+  | 'warehouse'
+  | 'promotional'
+  | 'other'
+
+export type CountMode =
+  | 'cycle'
+  | 'blind'
+  | 'aisle'
+  | 'category'
+  | 'supplier'
+  | 'zone'
+  | 'full'
+  | 'recount'
+
+export type CountStatus = 'open' | 'counting' | 'pending_approval' | 'approved' | 'cancelled'
+
+export type PrintJobType =
+  | 'receipt'
+  | 'product_label'
+  | 'shelf_label'
+  | 'warehouse_label'
+  | 'variance_report'
+  | 'count_report'
+  | 'po_document'
+  | 'other'
+
+export type PrintJobStatus = 'queued' | 'printing' | 'done' | 'failed' | 'cancelled'
+
+/**
+ * Optional `medium` hint inside a print job payload. The payload stays
+ * device-neutral — this only tells the renderer which paper it is aiming at,
+ * and an adapter is free to ignore it.
+ */
+export type PrintMediumHint =
+  | 'receipt-80mm'
+  | 'receipt-58mm'
+  | 'label-50x25'
+  | 'label-40x30'
+  | 'a4'
+
+/**
+ * What resolve_barcode returns. Money and quantities cross the wire as strings
+ * so nothing is rounded on the way in.
+ */
+export type ResolvedBarcode =
+  | { found: false; code: string }
+  | {
+      found: true
+      code: string
+      variant_id: string
+      product_id: string
+      product_name: string
+      variant_name: string | null
+      sku: string | null
+      selling_price: string
+      /** Base units this one scan represents — >1 for a carton code. */
+      units_per_scan: string
+      kind: BarcodeKind
+    }
+
+/**
+ * approve_count_session returns a RESULT, not an exception, when the PIN is
+ * wrong. A raise would roll back the denial audit record written alongside it
+ * (0023) — so failure has to commit.
+ */
+export interface CountApprovalResult {
+  approved: boolean
+  already_approved?: boolean
+  reason?: 'bad_pin' | 'locked_out' | 'not_authorized' | 'cancelled'
+  adjustments?: number
+  shrinkage_value?: string
+}

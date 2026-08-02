@@ -44,6 +44,9 @@ import { toast } from '@/hooks/use-toast'
 import { toReadableError } from '@/lib/errors'
 import { recordActorActivity } from '@/features/control/activity'
 import { OpenShiftDialog, CloseShiftDialog } from '@/features/control/shift-controls'
+import { useScanToBasket } from '@/features/scan/use-scan-to-basket'
+import { ScanStrip } from '@/features/scan/scan-strip'
+import { useRegistryShortcuts, SHORTCUT_HINTS } from '@/features/control/use-registry-shortcuts'
 
 /**
  * The cashier canvas. Deliberately narrow: selling, the basket, receipts, and
@@ -75,6 +78,12 @@ export function RegistryWorkspace() {
   const [safeDropOpen, setSafeDropOpen] = useState(false)
   const [openShiftOpen, setOpenShiftOpen] = useState(false)
   const [closeShiftOpen, setCloseShiftOpen] = useState(false)
+
+  // Scanning is disabled while a modal owns the screen, so a scan can't drop an
+  // item into the basket behind an open payment dialog.
+  const scanIdle = !paymentOpen && !heldOpen && !expenseOpen && !safeDropOpen &&
+    !openShiftOpen && !closeShiftOpen && !mobileCartOpen
+  const { feedback: scanFeedback } = useScanToBasket(scanIdle)
 
   const drawerCash = summary.data?.drawerCash ?? new Decimal(openShift?.opening_float ?? '0')
 
@@ -150,6 +159,20 @@ export function RegistryWorkspace() {
       })
     }
   }
+
+  // Hands stay on the scanner and the number pad, not the mouse.
+  useRegistryShortcuts(
+    {
+      onPay: () => lines.length > 0 && setPaymentOpen(true),
+      onHold: () => void hold(),
+      onResume: () => setHeldOpen(true),
+      onPettyCash: () => openShift && setExpenseOpen(true),
+      onSafeDrop: () => void requestSafeDrop(),
+      onShift: () => (openShift ? setCloseShiftOpen(true) : setOpenShiftOpen(true)),
+      onClear: () => void clearBasket(),
+    },
+    scanIdle,
+  )
 
   return (
     <div className="flex min-h-dvh flex-col bg-background-subtle">
@@ -240,8 +263,11 @@ export function RegistryWorkspace() {
 
       {/* Main: picker + basket */}
       <div className="flex min-h-0 flex-1 flex-col gap-4 p-4 lg:flex-row">
-        <div className="min-h-0 flex-1 lg:flex-[2]">
-          <ProductPicker />
+        <div className="flex min-h-0 flex-1 flex-col gap-3 lg:flex-[2]">
+          <ScanStrip feedback={scanFeedback} />
+          <div className="min-h-0 flex-1">
+            <ProductPicker />
+          </div>
         </div>
 
         <div className="hidden min-h-0 w-96 shrink-0 flex-col gap-3 lg:flex">
@@ -295,6 +321,16 @@ export function RegistryWorkspace() {
                 danger
               />
             </CardContent>
+            <div className="flex flex-wrap gap-x-3 gap-y-1 border-t border-border px-4 py-2 text-xs text-text-muted">
+              {SHORTCUT_HINTS.map((hint) => (
+                <span key={hint.key} className="inline-flex items-center gap-1">
+                  <kbd className="rounded border border-border bg-surface px-1 font-mono text-[10px]">
+                    {hint.key}
+                  </kbd>
+                  {hint.label}
+                </span>
+              ))}
+            </div>
           </Card>
 
           {/* Private shift stats — drawer-scoped only, never business-wide */}

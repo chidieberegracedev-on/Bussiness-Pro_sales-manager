@@ -19,7 +19,8 @@ interface CartState {
   lines: CartLine[]
   /** Increments on every addLine call, including a merge that doesn't change lines.length — lets the picker refocus its search bar after every add, not just the first per variant. */
   addedCount: number
-  addLine: (item: { variantId: string; productName: string; variantName: string | null; baseUnit: string; unitPrice: Decimal }) => void
+  /** `quantity` defaults to 1; a carton barcode passes its units_per_scan (Phase 10). */
+  addLine: (item: { variantId: string; productName: string; variantName: string | null; baseUnit: string; unitPrice: Decimal; quantity?: Decimal }) => void
   removeLine: (variantId: string) => void
   setQuantity: (variantId: string, quantity: Decimal) => void
   /** Replaces the basket wholesale — used when resuming a held basket. */
@@ -32,13 +33,17 @@ export const useCartStore = create<CartState>((set, get) => ({
   lines: [],
   addedCount: 0,
 
-  addLine: (item) => {
+  addLine: ({ quantity, ...item }) => {
+    // A tap adds one; a carton scan adds the whole carton. The unit context
+    // comes from the barcode resolver, so the till never has to know what a
+    // carton is — it just adds what it was handed.
+    const step = quantity ?? new Decimal(1)
     const existing = get().lines.find((l) => l.variantId === item.variantId)
     if (existing) {
       // Merge by variantId — quantity accumulates, movementId stays stable (BR-S1.5).
       set({
         lines: get().lines.map((l) =>
-          l.variantId === item.variantId ? { ...l, quantity: l.quantity.plus(1) } : l,
+          l.variantId === item.variantId ? { ...l, quantity: l.quantity.plus(step) } : l,
         ),
         addedCount: get().addedCount + 1,
       })
@@ -49,7 +54,7 @@ export const useCartStore = create<CartState>((set, get) => ({
         ...get().lines,
         {
           ...item,
-          quantity: new Decimal(1),
+          quantity: step,
           movementId: crypto.randomUUID(),
         },
       ],
