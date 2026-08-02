@@ -24,7 +24,10 @@ export function ProductCardGrid({ products }: { products: GroupedProduct[] }) {
         return (
           <Card
             key={product.productId}
-            className={cn('cursor-pointer overflow-hidden transition-shadow hover:shadow-md', !product.isActive && 'opacity-60')}
+            className={cn(
+              'cursor-pointer overflow-hidden transition-colors hover:border-border-strong',
+              !product.isActive && 'opacity-60',
+            )}
             onClick={() => navigate(`/products/${product.productId}`)}
           >
             <div className="flex aspect-square items-center justify-center bg-surface-muted">
@@ -32,11 +35,13 @@ export function ProductCardGrid({ products }: { products: GroupedProduct[] }) {
             </div>
             <div className="space-y-1.5 p-3">
               <div className="flex items-start justify-between gap-1">
-                <p className="line-clamp-2 text-sm font-medium text-text-primary">{product.productName}</p>
+                <p className="line-clamp-2 text-sm font-semibold leading-snug text-text-primary">
+                  {product.productName}
+                </p>
                 <ProductActionsMenu product={product} />
               </div>
               <div className="flex items-center justify-between text-sm">
-                <span className="text-text-secondary">
+                <span className="font-semibold text-accent-primary">
                   <Money value={product.priceMin} />
                   {product.priceMin !== product.priceMax && '+'}
                 </span>

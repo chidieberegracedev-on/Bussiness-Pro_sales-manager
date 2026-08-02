@@ -12,7 +12,7 @@ export function AuthLayout({ title, description, children }: { title: string; de
           <h1 className="mt-4 text-xl font-semibold text-text-primary">{title}</h1>
           {description && <p className="mt-1 text-sm text-text-secondary">{description}</p>}
         </div>
-        <div className="rounded-xl border border-border bg-surface p-6 shadow-sm">{children}</div>
+        <div className="rounded-xl border border-border bg-surface p-6 ">{children}</div>
       </div>
     </div>
   )

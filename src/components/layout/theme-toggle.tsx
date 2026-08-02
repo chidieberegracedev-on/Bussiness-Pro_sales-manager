@@ -23,7 +23,7 @@ export function ThemeToggle() {
           onClick={() => setTheme(value)}
           className={cn(
             'flex min-h-9 items-center gap-1.5 rounded-sm px-3 py-1.5 text-sm font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-            theme === value ? 'bg-surface text-text-primary shadow-sm' : 'text-text-secondary hover:text-text-primary',
+            theme === value ? 'bg-surface text-text-primary' : 'text-text-secondary hover:text-text-primary',
           )}
         >
           <Icon className="size-4" />

@@ -13,7 +13,9 @@ export function AppShell() {
       <div className="flex min-w-0 flex-1 flex-col">
         <TopBar />
         <OfflineBanner />
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-8">
+        {/* Whitespace is doing the work shadows used to: cards separate by
+            contrast against the warm page and by the air between them. */}
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 lg:p-9">
           <Outlet />
         </main>
       </div>

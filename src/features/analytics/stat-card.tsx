@@ -39,7 +39,7 @@ export function StatCard({
   return (
     <div
       className={cn(
-        'flex flex-col gap-3 rounded-xl border border-border bg-card p-5 shadow-sm transition-shadow hover:shadow-md',
+        'flex flex-col gap-3 rounded-xl border border-border bg-card p-5 transition-colors hover:border-border-strong',
         className,
       )}
     >

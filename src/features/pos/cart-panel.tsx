@@ -125,8 +125,16 @@ export function CartPanel({
           <Button className="w-full" size="lg" onClick={onTakePayment}>
             Take payment
           </Button>
+          {/* Neutral at rest, red on approach. A destructive action needs to
+              be findable, not loud — permanent red competes with the one accent
+              that's meant to lead. */}
           {onClear && (
-            <Button variant="ghost" size="sm" className="w-full text-danger" onClick={onClear}>
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full text-text-secondary hover:bg-danger/5 hover:text-danger"
+              onClick={onClear}
+            >
               Clear basket
             </Button>
           )}

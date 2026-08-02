@@ -134,7 +134,7 @@ export function ProductPerformancePage() {
                 className={cn(
                   'rounded-md px-3 py-1.5 text-sm font-medium transition-all',
                   preset === key
-                    ? 'bg-card text-text-primary shadow-sm'
+                    ? 'bg-card text-text-primary'
                     : 'text-text-secondary hover:text-text-primary',
                 )}
               >
@@ -226,7 +226,7 @@ export function ProductPerformancePage() {
                     className={cn(
                       'rounded px-2.5 py-1 font-medium transition-all capitalize',
                       sort === key
-                        ? 'bg-card text-text-primary shadow-sm'
+                        ? 'bg-card text-text-primary'
                         : 'text-text-muted hover:text-text-primary',
                     )}
                   >

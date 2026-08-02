@@ -113,7 +113,7 @@ export function SalesReportPage() {
                 className={cn(
                   'rounded-md px-3 py-1.5 text-sm font-medium transition-all',
                   preset === key
-                    ? 'bg-card text-text-primary shadow-sm'
+                    ? 'bg-card text-text-primary'
                     : 'text-text-secondary hover:text-text-primary',
                 )}
               >

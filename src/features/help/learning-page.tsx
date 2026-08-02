@@ -134,7 +134,7 @@ export function LearningCenterPage() {
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
         <Link
           to="/help/dictionary"
-          className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 transition-shadow hover:shadow-md"
+          className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:border-border-strong"
         >
           <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent-primary/10 text-accent-primary">
             <BookA className="size-5" />
@@ -147,7 +147,7 @@ export function LearningCenterPage() {
         </Link>
         <Link
           to="/help/calculator"
-          className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 transition-shadow hover:shadow-md"
+          className="flex items-center gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:border-border-strong"
         >
           <div className="flex size-10 shrink-0 items-center justify-center rounded-lg bg-accent-secondary/10 text-accent-secondary">
             <Calculator className="size-5" />

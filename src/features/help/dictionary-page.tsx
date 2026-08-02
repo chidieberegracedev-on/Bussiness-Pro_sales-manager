@@ -208,7 +208,7 @@ function DictionaryCard({
       id={entry.slug}
       className={cn(
         'scroll-mt-6 rounded-xl border bg-card p-5 transition-shadow',
-        highlighted ? 'border-accent-primary shadow-md ring-1 ring-accent-primary/30' : 'border-border',
+        highlighted ? 'border-accent-primary ring-1 ring-accent-primary/30' : 'border-border',
       )}
     >
       <div className="flex items-start justify-between gap-3">

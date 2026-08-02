@@ -99,7 +99,7 @@ export function RecordExpenseDialog({
                   className={cn(
                     'flex flex-col items-center gap-1 rounded-lg border p-3 text-sm transition-all',
                     paidFrom === s.value
-                      ? 'border-accent-primary bg-accent-primary/5 text-text-primary shadow-sm'
+                      ? 'border-accent-primary bg-accent-primary/5 text-text-primary'
                       : 'border-border text-text-secondary hover:border-border-strong',
                   )}
                 >

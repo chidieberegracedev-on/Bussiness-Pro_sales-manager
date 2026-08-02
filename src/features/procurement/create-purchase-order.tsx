@@ -232,7 +232,7 @@ export function CreatePurchaseOrderPage() {
                     className={cn(
                       'flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-all capitalize',
                       status === s
-                        ? 'bg-card text-text-primary shadow-sm'
+                        ? 'bg-card text-text-primary'
                         : 'text-text-secondary hover:text-text-primary',
                     )}
                   >

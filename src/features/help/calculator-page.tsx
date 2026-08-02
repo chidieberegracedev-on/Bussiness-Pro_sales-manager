@@ -311,7 +311,7 @@ function UnitTab({ onRecord }: { onRecord: RecordFn }) {
           type="button"
           onClick={() => setMode('pack')}
           className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-all ${
-            mode === 'pack' ? 'bg-card text-text-primary shadow-sm' : 'text-text-secondary'
+            mode === 'pack' ? 'bg-card text-text-primary' : 'text-text-secondary'
           }`}
         >
           Packs &amp; cartons
@@ -320,7 +320,7 @@ function UnitTab({ onRecord }: { onRecord: RecordFn }) {
           type="button"
           onClick={() => setMode('measure')}
           className={`flex-1 rounded-md px-3 py-1.5 text-sm font-medium transition-all ${
-            mode === 'measure' ? 'bg-card text-text-primary shadow-sm' : 'text-text-secondary'
+            mode === 'measure' ? 'bg-card text-text-primary' : 'text-text-secondary'
           }`}
         >
           Weight, volume, length
@@ -338,7 +338,7 @@ function UnitTab({ onRecord }: { onRecord: RecordFn }) {
               type="button"
               onClick={() => setDirection('toBase')}
               className={`flex-1 rounded px-2 py-1 font-medium ${
-                direction === 'toBase' ? 'bg-card text-text-primary shadow-sm' : 'text-text-muted'
+                direction === 'toBase' ? 'bg-card text-text-primary' : 'text-text-muted'
               }`}
             >
               Cartons → units
@@ -347,7 +347,7 @@ function UnitTab({ onRecord }: { onRecord: RecordFn }) {
               type="button"
               onClick={() => setDirection('toPack')}
               className={`flex-1 rounded px-2 py-1 font-medium ${
-                direction === 'toPack' ? 'bg-card text-text-primary shadow-sm' : 'text-text-muted'
+                direction === 'toPack' ? 'bg-card text-text-primary' : 'text-text-muted'
               }`}
             >
               Units → cartons

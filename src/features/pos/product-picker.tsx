@@ -8,7 +8,6 @@ import { variantLabel, type GroupedProduct } from '@/features/products/types'
 import { useSignedImageUrls } from '@/hooks/use-signed-image-url'
 import { PRODUCT_IMAGE_BUCKET } from '@/lib/storage-buckets'
 import { Input } from '@/components/ui/input'
-import { Button } from '@/components/ui/button'
 import { Money } from '@/components/money/money'
 import { StockStatusBadge } from '@/components/data/stock-status-badge'
 import { EmptyState } from '@/components/data/empty-state'
@@ -64,26 +63,29 @@ function ProductTile({ product, imageUrl }: { product: GroupedProduct; imageUrl:
   const tileContent = (
     <div
       className={cn(
-        'flex flex-col gap-2 rounded-lg border border-border p-3 text-left transition-shadow hover:shadow-md',
+        // No padding around the image: it runs to the card edge, and only the
+        // text below is inset. That single change is most of what separates a
+        // designed tile from a boxed one.
+        'flex flex-col overflow-hidden rounded-lg border border-border bg-card text-left transition-colors hover:border-border-strong',
         !product.isActive && 'opacity-60',
       )}
     >
-      <div className="flex aspect-square items-center justify-center overflow-hidden rounded-md bg-surface-muted">
+      <div className="flex aspect-square items-center justify-center bg-surface-muted">
         {imageUrl ? (
           <img src={imageUrl} alt="" className="size-full object-cover" />
         ) : (
           <Package className="size-8 text-text-muted" />
         )}
       </div>
-      <div>
-        <p className="line-clamp-2 text-sm font-medium text-text-primary">{product.productName}</p>
-        <div className="mt-1 flex items-center justify-between">
-          <span className="text-sm text-text-secondary">
+      <div className="p-2.5">
+        <p className="line-clamp-2 text-sm font-semibold leading-snug text-text-primary">
+          {product.productName}
+        </p>
+        <div className="mt-1 flex items-center justify-between gap-2">
+          <span className="text-sm font-semibold text-accent-primary">
             <Money value={product.priceMin} />
             {product.priceMin !== product.priceMax && '+'}
           </span>
-        </div>
-        <div className="mt-1">
           <StockStatusBadge status={product.worstStatus} />
         </div>
       </div>
@@ -158,25 +160,21 @@ export function ProductPicker() {
         />
       </div>
 
-      <div className="flex flex-wrap gap-2">
-        <Button
-          type="button"
-          size="sm"
-          variant={categoryId === 'all' ? 'default' : 'outline'}
-          onClick={() => setCategoryId('all')}
-        >
+      {/* Chips are navigation, not the point of the screen. They select with a
+          neutral fill so the accent stays reserved for Take payment — one
+          accent per screen is what makes that button read as the next step. */}
+      <div className="flex flex-wrap gap-1.5">
+        <CategoryChip active={categoryId === 'all'} onClick={() => setCategoryId('all')}>
           All
-        </Button>
+        </CategoryChip>
         {categories?.map((c) => (
-          <Button
+          <CategoryChip
             key={c.id}
-            type="button"
-            size="sm"
-            variant={categoryId === c.id ? 'default' : 'outline'}
+            active={categoryId === c.id}
             onClick={() => setCategoryId(c.id)}
           >
             {c.name}
-          </Button>
+          </CategoryChip>
         ))}
       </div>
 
@@ -203,5 +201,36 @@ export function ProductPicker() {
         )}
       </div>
     </div>
+  )
+}
+
+/**
+ * A filter chip. Deliberately not a Button: `variant="default"` would give it
+ * the same accent and weight as Take payment, and when everything on screen
+ * carries the accent, nothing does. Selection reads through a neutral fill.
+ */
+function CategoryChip({
+  active,
+  onClick,
+  children,
+}: {
+  active: boolean
+  onClick: () => void
+  children: React.ReactNode
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={cn(
+        'min-h-11 rounded-full border px-3.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
+        active
+          ? 'border-transparent bg-text-primary font-semibold text-background'
+          : 'border-border bg-surface text-text-secondary hover:bg-surface-muted hover:text-text-primary',
+      )}
+    >
+      {children}
+    </button>
   )
 }

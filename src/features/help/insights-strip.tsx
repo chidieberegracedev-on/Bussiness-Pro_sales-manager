@@ -119,7 +119,7 @@ function InsightCard({
       type="button"
       onClick={() => onOpen(meta.route!)}
       aria-label={`${insight.text} — open ${meta.routeLabel}`}
-      className={cn(baseClass, 'transition-shadow hover:shadow-md')}
+      className={cn(baseClass, 'transition-colors hover:border-border-strong')}
     >
       {content}
     </button>

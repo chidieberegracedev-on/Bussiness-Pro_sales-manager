@@ -273,7 +273,7 @@ function BalanceCard({
     <button
       type="button"
       onClick={onClick}
-      className="flex flex-col gap-3 rounded-xl border border-border bg-card p-5 text-left shadow-sm transition-all hover:shadow-md"
+      className="flex flex-col gap-3 rounded-xl border border-border bg-card p-5 text-left transition-colors hover:border-border-strong"
     >
       <div className="flex items-center justify-between">
         <span className="text-sm font-medium text-text-secondary">{label}</span>
