@@ -14,6 +14,7 @@ import {
   Undo2,
   Trash2,
   AlertTriangle,
+  ClipboardCheck,
 } from 'lucide-react'
 import { ProductPicker } from '@/features/pos/product-picker'
 import { CartPanel } from '@/features/pos/cart-panel'
@@ -42,6 +43,7 @@ import { formatDateTime } from '@/lib/format'
 import { toast } from '@/hooks/use-toast'
 import { toReadableError } from '@/lib/errors'
 import { recordActorActivity } from '@/features/control/activity'
+import { OpenShiftDialog, CloseShiftDialog } from '@/features/control/shift-controls'
 
 /**
  * The cashier canvas. Deliberately narrow: selling, the basket, receipts, and
@@ -71,6 +73,8 @@ export function RegistryWorkspace() {
   const [heldOpen, setHeldOpen] = useState(false)
   const [expenseOpen, setExpenseOpen] = useState(false)
   const [safeDropOpen, setSafeDropOpen] = useState(false)
+  const [openShiftOpen, setOpenShiftOpen] = useState(false)
+  const [closeShiftOpen, setCloseShiftOpen] = useState(false)
 
   const drawerCash = summary.data?.drawerCash ?? new Decimal(openShift?.opening_float ?? '0')
 
@@ -167,16 +171,29 @@ export function RegistryWorkspace() {
             </div>
           </div>
 
-          <div className="hidden items-center gap-1.5 text-xs text-text-secondary sm:flex">
-            <Clock className="size-3.5 text-text-muted" />
-            {shiftLoading ? (
-              <Skeleton className="h-3 w-24" />
-            ) : openShift && business ? (
-              <>Shift from {formatDateTime(openShift.opened_at, business.timezone, locale)}</>
-            ) : (
-              <span className="text-warning">No shift open</span>
-            )}
-          </div>
+          {/* The shift tools live in a column that's hidden below lg, so this
+              chip is the only shift control a phone cashier ever sees. It has
+              to be actionable at every width, not decorative. */}
+          {shiftLoading ? (
+            <Skeleton className="h-4 w-28" />
+          ) : openShift && business ? (
+            <button
+              type="button"
+              onClick={() => setCloseShiftOpen(true)}
+              className="flex items-center gap-1.5 rounded-md px-1.5 py-1 text-xs text-text-secondary transition-colors hover:bg-surface-muted hover:text-text-primary"
+            >
+              <Clock className="size-3.5 text-text-muted" />
+              <span className="hidden sm:inline">
+                Shift from {formatDateTime(openShift.opened_at, business.timezone, locale)}
+              </span>
+              <span className="sm:hidden">Shift open</span>
+              <span className="font-medium text-accent-primary">· Close</span>
+            </button>
+          ) : (
+            <span className="flex items-center gap-1.5 text-xs text-warning">
+              <Clock className="size-3.5" /> No shift open
+            </span>
+          )}
 
           <div className="flex items-center gap-1.5 text-sm">
             <Wallet className="size-4 text-text-muted" />
@@ -206,13 +223,18 @@ export function RegistryWorkspace() {
         </div>
       </header>
 
+      {/* A warning with no way to act on it is just noise. The button is the
+          point of the banner. */}
       {!openShift && !shiftLoading && (
-        <div className="flex items-start gap-2.5 border-b border-warning/30 bg-warning/5 px-4 py-2.5">
-          <AlertTriangle className="mt-0.5 size-4 shrink-0 text-warning" />
-          <p className="text-sm text-text-secondary">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-warning/30 bg-warning/5 px-4 py-2.5">
+          <AlertTriangle className="size-4 shrink-0 text-warning" />
+          <p className="min-w-0 flex-1 text-sm text-text-secondary">
             No shift is open on this terminal. Cash sales won't be attached to a drawer until one is
             opened.
           </p>
+          <Button size="sm" onClick={() => setOpenShiftOpen(true)}>
+            <Clock className="size-3.5" /> Open shift
+          </Button>
         </div>
       )}
 
@@ -237,8 +259,34 @@ export function RegistryWorkspace() {
               <ToolButton icon={PauseCircle} label="Hold" onClick={hold} disabled={lines.length === 0} />
               <ToolButton icon={PlayCircle} label="Resume" onClick={() => setHeldOpen(true)} />
               <ToolButton icon={Undo2} label="Return" onClick={() => toast({ title: 'Start a return from Sales → the original receipt' })} />
-              <ToolButton icon={Receipt} label="Petty cash" onClick={() => setExpenseOpen(true)} />
-              <ToolButton icon={Vault} label="Safe drop" onClick={requestSafeDrop} />
+              <ToolButton
+                icon={Receipt}
+                label="Petty cash"
+                onClick={() => setExpenseOpen(true)}
+                disabled={!openShift}
+              />
+              <ToolButton
+                icon={Vault}
+                label="Safe drop"
+                onClick={requestSafeDrop}
+                disabled={!openShift}
+              />
+              {/* The shift control lives with the other shift tools, and reads
+                  as one slot that changes state rather than two that fight. */}
+              {openShift ? (
+                <ToolButton
+                  icon={ClipboardCheck}
+                  label="Close shift"
+                  onClick={() => setCloseShiftOpen(true)}
+                />
+              ) : (
+                <ToolButton
+                  icon={Clock}
+                  label="Open shift"
+                  onClick={() => setOpenShiftOpen(true)}
+                  disabled={shiftLoading}
+                />
+              )}
               <ToolButton
                 icon={Trash2}
                 label="Clear"
@@ -252,9 +300,37 @@ export function RegistryWorkspace() {
           {/* Private shift stats — drawer-scoped only, never business-wide */}
           <Card>
             <CardContent className="space-y-1.5 pt-4 text-sm">
-              <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
-                Your shift
-              </p>
+              <div className="flex items-center justify-between">
+                <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
+                  Your shift
+                </p>
+                {openShift && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="-mr-2 h-7 text-xs"
+                    onClick={() => setCloseShiftOpen(true)}
+                  >
+                    Close / handover
+                  </Button>
+                )}
+              </div>
+
+              {/* Rows of zeros describe a drawer that doesn't exist. Say that,
+                  and offer the one action that changes it. */}
+              {!openShift && !shiftLoading ? (
+                <div className="rounded-lg border border-dashed border-border p-4 text-center">
+                  <Clock className="mx-auto size-6 text-text-muted" />
+                  <p className="mt-2 text-sm font-medium text-text-primary">No shift open</p>
+                  <p className="mt-0.5 text-xs text-text-secondary">
+                    Open one to start tracking this drawer.
+                  </p>
+                  <Button size="sm" className="mt-3 w-full" onClick={() => setOpenShiftOpen(true)}>
+                    <Clock className="size-3.5" /> Open shift
+                  </Button>
+                </div>
+              ) : (
+                <>
               <StatLine
                 icon={Wallet}
                 label="Opening float"
@@ -299,6 +375,8 @@ export function RegistryWorkspace() {
                   <Money value={drawerCash} />
                 </span>
               </div>
+                </>
+              )}
             </CardContent>
           </Card>
         </div>
@@ -342,6 +420,17 @@ export function RegistryWorkspace() {
         <TransferCashDialog
           initial={{ from: 'cash', to: 'safe', shiftId: openShift?.id }}
           onClose={() => setSafeDropOpen(false)}
+        />
+      )}
+
+      {openShiftOpen && <OpenShiftDialog onClose={() => setOpenShiftOpen(false)} />}
+      {closeShiftOpen && openShift && (
+        <CloseShiftDialog
+          shift={openShift}
+          onClose={() => setCloseShiftOpen(false)}
+          // Handover: the counted cash becomes the next shift's float, so the
+          // drawer carries across a change of person without a second count.
+          onHandover={() => setOpenShiftOpen(true)}
         />
       )}
 
