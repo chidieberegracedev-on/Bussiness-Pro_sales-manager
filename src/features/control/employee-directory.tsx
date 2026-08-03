@@ -460,7 +460,7 @@ function AddOperatorDialog({ isOwner, onClose }: { isOwner: boolean; onClose: ()
                 className="mt-1"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Sarah Adeyemi"
+                placeholder="Their full name"
                 autoFocus
               />
               <p className="mt-1 text-xs text-text-muted">

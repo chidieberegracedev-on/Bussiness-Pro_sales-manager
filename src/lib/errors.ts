@@ -46,6 +46,13 @@ export function toReadableError(error: unknown): string {
     return "Couldn't reach the server. Your changes weren't saved."
   }
 
+  // Some errors are constructed with a message already written for the user —
+  // a wrong PIN with the number of tries left, for instance. Those must pass
+  // through untouched; the raw-message fallback below only runs in DEV, so
+  // without this they would collapse to "Something went wrong" in production
+  // and take their specifics with them.
+  if (isUserFacing(error) && raw) return raw
+
   for (const [pattern, message] of SIGNAL_MAP) {
     if (pattern.test(raw)) return message
   }
@@ -57,6 +64,19 @@ export function toReadableError(error: unknown): string {
   }
 
   return 'Something went wrong. Please try again.'
+}
+
+/**
+ * Marks an error whose `message` is already meant for the user. Set
+ * `userFacing = true` on the class rather than importing it here — errors.ts
+ * must not depend on any feature module.
+ */
+export function isUserFacing(error: unknown): boolean {
+  return (
+    !!error &&
+    typeof error === 'object' &&
+    (error as { userFacing?: unknown }).userFacing === true
+  )
 }
 
 export function isNetworkError(error: unknown): boolean {

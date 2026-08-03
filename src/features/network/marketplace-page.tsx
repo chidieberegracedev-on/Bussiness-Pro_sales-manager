@@ -30,7 +30,7 @@ import {
   type MarketplaceProduct,
   type MarketplaceRow,
 } from '@/features/network/use-network'
-import { VerificationBadge, TrustIndicators } from '@/features/network/trust-indicators'
+import { TrustTierBadge, TrustIndicators, TIER_LABELS } from '@/features/network/trust-indicators'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { toast } from '@/hooks/use-toast'
 import { toReadableError } from '@/lib/errors'
@@ -41,7 +41,7 @@ import { cn } from '@/lib/utils'
  *
  * One card per CANONICAL PRODUCT, expandable to the suppliers offering it —
  * not one card per listing. That distinction is the whole reason the canonical
- * catalog exists: four suppliers selling Indomie is one product to compare,
+ * catalog exists: four suppliers selling the same thing is one product to
  * not four products to scroll past.
  */
 export function MarketplacePage() {
@@ -102,7 +102,7 @@ export function MarketplacePage() {
         <StatTile icon={Store} value={String(stats.suppliers)} label="Suppliers" />
         <StatTile
           icon={ShieldCheck}
-          value={myProfile ? (myProfile.verification === 'verified' ? 'Live' : 'Pending') : '—'}
+          value={myProfile?.is_public ? TIER_LABELS[myProfile.trust_tier] : '—'}
           label="Your storefront"
           to="/network/my-profile"
         />
@@ -159,7 +159,7 @@ export function MarketplacePage() {
         <EmptyState
           icon={Globe}
           title="Nothing on the network yet"
-          description="Suppliers appear here once they publish a storefront and are verified. If you sell to other businesses, you can be one of the first."
+          description="Suppliers appear here as soon as they publish a storefront. If you sell to other businesses, you can be listed today."
           action={
             <Button asChild>
               <Link to="/network/my-profile">
@@ -340,11 +340,12 @@ function SupplierOffer({ row }: { row: MarketplaceRow }) {
       </div>
 
       <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-        <VerificationBadge verification={row.verification} />
+        <TrustTierBadge tier={row.trust_tier} />
         <TrustIndicators
           facts={{
             completed_orders: row.completed_orders,
             fulfillment_rate: row.fulfillment_rate,
+            repeat_customers: row.repeat_customers,
           }}
           compact
         />

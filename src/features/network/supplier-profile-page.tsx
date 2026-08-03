@@ -24,7 +24,13 @@ import {
   useConnectionStatusMap,
   type ListingWithTiers,
 } from '@/features/network/use-network'
-import { VerificationBadge, TrustIndicators } from '@/features/network/trust-indicators'
+import {
+  VerificationBadge,
+  TrustTierBadge,
+  TrustIndicators,
+  TIER_MEANING,
+} from '@/features/network/trust-indicators'
+import { BuyerProtectionNotice } from '@/features/network/buyer-protection'
 import { useActiveBusiness } from '@/features/business/hooks'
 import { toast } from '@/hooks/use-toast'
 import { toReadableError } from '@/lib/errors'
@@ -103,8 +109,12 @@ export function SupplierProfilePage() {
               <h1 className="truncate text-xl font-bold tracking-tight text-text-primary">
                 {profile.display_name}
               </h1>
-              <VerificationBadge verification={profile.verification} />
+              <TrustTierBadge tier={profile.trust_tier} />
+              {profile.verification === 'verified' && (
+                <VerificationBadge verification={profile.verification} />
+              )}
             </div>
+            <p className="mt-1 text-xs text-text-muted">{TIER_MEANING[profile.trust_tier]}</p>
             {profile.location_text && (
               <p className="mt-0.5 flex items-center gap-1.5 text-sm text-text-secondary">
                 <MapPin className="size-3.5 text-text-muted" /> {profile.location_text}
@@ -159,6 +169,8 @@ export function SupplierProfilePage() {
           </CardContent>
         </Card>
       )}
+
+      <BuyerProtectionNotice className="mb-4" />
 
       <h2 className="mb-3 text-base font-semibold text-text-primary">
         What they sell{listings && listings.length > 0 && ` (${listings.length})`}

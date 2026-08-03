@@ -275,7 +275,7 @@ function FirstEmployeeStep({ onBack, onDone }: { onBack: () => void; onDone: () 
             className="mt-1"
             value={name}
             onChange={(e) => setName(e.target.value)}
-            placeholder="e.g. Sarah Adeyemi"
+            placeholder="Their full name"
             autoFocus
           />
           <p className="mt-1 text-xs text-text-muted">

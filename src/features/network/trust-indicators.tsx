@@ -1,7 +1,54 @@
-import { BadgeCheck, Clock, Package, Repeat, ShieldQuestion } from 'lucide-react'
+import { BadgeCheck, Clock, Package, Repeat, ShieldQuestion, Sparkles, Star } from 'lucide-react'
 import { Badge } from '@/components/ui/badge'
-import type { SupplierVerification } from '@/types/database'
+import type { SupplierVerification, TrustTier } from '@/types/database'
 import { cn } from '@/lib/utils'
+
+/**
+ * Trust tiers (0027). Verification gates RISK, not ACCESS — a supplier is on
+ * the network from the day they publish, and the tier says how far they've
+ * earned their way up, not whether they're allowed to be here.
+ */
+export const TIER_LABELS: Record<TrustTier, string> = {
+  provisional: 'New supplier',
+  verified: 'Verified',
+  trusted: 'Trusted',
+  preferred: 'Preferred',
+}
+
+export const TIER_MEANING: Record<TrustTier, string> = {
+  provisional: 'Listed and open for business. Not yet verified — check their details before a large first order.',
+  verified: 'Identity, location and business details confirmed.',
+  trusted: 'Verified, with a proven record of delivering what was ordered.',
+  preferred: 'Consistently high performance across many orders and repeat buyers.',
+}
+
+const TIER_ICON: Record<TrustTier, typeof BadgeCheck> = {
+  provisional: Sparkles,
+  verified: BadgeCheck,
+  trusted: Star,
+  preferred: Star,
+}
+
+const TIER_VARIANT: Record<TrustTier, 'muted' | 'success' | 'info'> = {
+  provisional: 'muted',
+  verified: 'success',
+  trusted: 'success',
+  preferred: 'info',
+}
+
+/**
+ * The tier badge. "New supplier" is deliberately neutral rather than a warning
+ * colour — being new is not a fault, and colouring it as one would push every
+ * buyer away from exactly the suppliers the network needs to attract.
+ */
+export function TrustTierBadge({ tier, className }: { tier: TrustTier; className?: string }) {
+  const Icon = TIER_ICON[tier]
+  return (
+    <Badge variant={TIER_VARIANT[tier]} className={className} title={TIER_MEANING[tier]}>
+      <Icon className="size-3.5" aria-hidden="true" /> {TIER_LABELS[tier]}
+    </Badge>
+  )
+}
 
 /**
  * Trust, shown as facts rather than a score.

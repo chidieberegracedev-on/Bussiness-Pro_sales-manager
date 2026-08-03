@@ -60,9 +60,9 @@ const FAQS: { question: string; answer: string }[] = [
       'Profit and cash are different things. Profit is what you earned on the goods you sold; cash is what you can spend right now. Money tied up in new stock, or owed to suppliers, reduces cash without reducing profit. The Finance overview shows both side by side.',
   },
   {
-    question: 'I bought a carton for 12,000. Why does each pack show a much smaller cost?',
+    question: 'I bought a carton. Why does each pack show a much smaller cost?',
     answer:
-      'Because cost is always stored per selling unit. A carton of 12 packs at 12,000 is 1,000 per pack, and 1,000 is what the app uses when it works out your profit on a pack. You enter the carton price; the app does the division.',
+      'Because cost is always stored per selling unit. A carton of 12 packs costs a twelfth of the carton price per pack, and that per-pack figure is what the app uses when it works out your profit on a pack. You enter the carton price; the app does the division.',
   },
   {
     question: 'What is a blind close, and why can I not see the expected amount first?',

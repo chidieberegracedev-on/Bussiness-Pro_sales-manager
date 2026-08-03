@@ -102,7 +102,9 @@ export interface Database {
           contact_whatsapp: string | null
           contact_email: string | null
           verification: SupplierVerification
-          /** Listed only when is_public AND verification = 'verified'. */
+          /** Earned standing. Publishing alone makes a supplier discoverable. */
+          trust_tier: TrustTier
+          /** Listed when is_public AND verification is not 'rejected' (0027). */
           is_public: boolean
           completed_orders: number
           fulfillment_rate: string | null
@@ -975,8 +977,12 @@ export interface Database {
           supplier_name: string
           location_text: string | null
           verification: SupplierVerification
+          trust_tier: TrustTier
           fulfillment_rate: string | null
           completed_orders: number
+          repeat_customers: number
+          avg_response_minutes: number | null
+          supplier_since: string
           purchase_unit: string
           min_order_qty: string
           availability: ListingStatus
@@ -1476,6 +1482,10 @@ export interface Database {
         }
         Returns: Database['public']['Tables']['business_members']['Row']
       }
+      unlock_session: {
+        Args: { p_token: string; p_pin: string }
+        Returns: PinUnlockResult
+      }
       pin_unlock: {
         Args: {
           p_business_id: string
@@ -1483,7 +1493,8 @@ export interface Database {
           p_terminal_id: string
           p_pin: string
         }
-        Returns: { token: string; member_id: string; role: MemberRole }
+        /** Returns a RESULT — a wrong PIN no longer raises (0026). */
+        Returns: PinUnlockResult
       }
       pin_resume_session: {
         Args: { p_token: string; p_pin: string }
@@ -1675,3 +1686,36 @@ export interface CountApprovalResult {
 export type SupplierVerification = 'unverified' | 'pending' | 'verified' | 'rejected'
 export type ListingStatus = 'active' | 'out_of_stock' | 'hidden'
 export type ConnectStatus = 'requested' | 'accepted' | 'declined' | 'revoked'
+
+/**
+ * Progressive trust (0027). Verification gates RISK, not ACCESS: a supplier is
+ * discoverable from the moment they publish, and the tier decides limits,
+ * ranking and badges rather than whether they exist.
+ */
+export type TrustTier = 'provisional' | 'verified' | 'trusted' | 'preferred'
+
+/**
+ * pin_unlock / unlock_session return a result rather than raising on a bad PIN.
+ *
+ * 0026 had to change the contract to fix the lockout: the old version
+ * incremented failed_count and then raised, and the raise rolled the increment
+ * back — so the counter never moved and the 5-attempt lockout never fired,
+ * despite the UI promising it. A write cannot survive a raise in the same
+ * transaction, so failure has to RETURN.
+ */
+export type PinFailureReason =
+  | 'incorrect'
+  | 'locked'
+  | 'no_pin'
+  | 'no_session'
+  | 'device_not_authenticated'
+
+export type PinUnlockResult =
+  | { ok: true; token: string; member_id: string; role: MemberRole }
+  | {
+      ok: false
+      reason: PinFailureReason
+      /** Present on 'incorrect' — how many tries are left before a lockout. */
+      attempts_remaining?: number
+      locked_until?: string
+    }

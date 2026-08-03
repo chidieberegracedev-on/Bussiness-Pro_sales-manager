@@ -108,7 +108,7 @@ export function SupplierFormPage({ mode }: SupplierFormPageProps) {
                     <FormItem>
                       <FormLabel>Name</FormLabel>
                       <FormControl>
-                        <Input {...field} placeholder="e.g. Lagos Wholesale Co." autoFocus />
+                        <Input {...field} placeholder="Supplier name" autoFocus />
                       </FormControl>
                       <FormMessage />
                     </FormItem>

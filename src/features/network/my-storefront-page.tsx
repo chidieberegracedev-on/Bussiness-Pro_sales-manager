@@ -3,11 +3,11 @@ import { Link } from 'react-router-dom'
 import {
   Store,
   Globe,
+  Sparkles,
   Loader2,
   ShieldCheck,
   Info,
   Eye,
-  Clock,
   Lock,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
@@ -19,20 +19,29 @@ import {
   usePublishSupplierProfile,
   useUpdateSupplierProfile,
 } from '@/features/network/use-network'
-import { VerificationBadge, TrustIndicators } from '@/features/network/trust-indicators'
+import {
+  VerificationBadge,
+  TrustTierBadge,
+  TrustIndicators,
+  TIER_LABELS,
+  TIER_MEANING,
+} from '@/features/network/trust-indicators'
+import type { TrustTier } from '@/types/database'
 import { useActiveBusiness } from '@/features/business/hooks'
 import { toast } from '@/hooks/use-toast'
 import { toReadableError } from '@/lib/errors'
 
 /**
- * Becoming a public supplier — a deliberate act, not a default.
+ * Becoming a public supplier — a deliberate act, but not a waiting room.
  *
- * Every business is private until it does this, and publishing alone is not
- * enough: the profile only appears on the network once it has been verified.
- * The screen says both things plainly, because a business that thinks it is
- * listed when it isn't will conclude the network is empty rather than that it
- * is waiting.
+ * Every business is private until it publishes. Publishing makes it live the
+ * same day (0027): verification raises limits and ranking, it does not decide
+ * whether the supplier exists. The old model held a new supplier invisible
+ * until an admin got to them, which reads as a broken marketplace rather than
+ * a queue, and is how you lose the suppliers you most need to attract.
  */
+const TIER_ORDER: TrustTier[] = ['provisional', 'verified', 'trusted', 'preferred']
+
 export function MyStorefrontPage() {
   const { business, role } = useActiveBusiness()
   const { data: profile, isLoading } = useMySupplierProfile()
@@ -76,7 +85,7 @@ export function MyStorefrontPage() {
         title: profile ? 'Storefront updated' : 'Storefront submitted',
         description: profile
           ? 'Your changes are saved.'
-          : 'It goes live on the network once it has been verified.',
+          : "You're live — buyers can find you now. Verification comes later and raises your limits.",
       })
     } catch (error) {
       toast({
@@ -106,7 +115,10 @@ export function MyStorefrontPage() {
     }
   }
 
-  const live = profile?.is_public && profile.verification === 'verified'
+  // Published is live. Verification lifts limits and ranking; it is not a gate
+  // on existing (0027).
+  const live = !!profile?.is_public && profile.verification !== 'rejected'
+  const provisional = live && profile?.verification !== 'verified'
 
   return (
     <div className="space-y-6">
@@ -129,33 +141,33 @@ export function MyStorefrontPage() {
       {!isLoading && (
         <div
           className={`flex items-start gap-2.5 rounded-lg border p-3 ${
-            live
-              ? 'border-success/30 bg-success/5'
-              : profile
-                ? 'border-warning/30 bg-warning/5'
+            provisional
+              ? 'border-accent-primary/30 bg-accent-primary/5'
+              : live
+                ? 'border-success/30 bg-success/5'
                 : 'border-border bg-surface-muted/50'
           }`}
         >
-          {live ? (
+          {provisional ? (
+            <Sparkles className="mt-0.5 size-4 shrink-0 text-accent-primary" />
+          ) : live ? (
             <Globe className="mt-0.5 size-4 shrink-0 text-success" />
-          ) : profile ? (
-            <Clock className="mt-0.5 size-4 shrink-0 text-warning" />
           ) : (
             <Lock className="mt-0.5 size-4 shrink-0 text-text-muted" />
           )}
           <div className="min-w-0 text-sm">
             <p className="font-medium text-text-primary">
-              {live
-                ? 'Live on the network'
-                : profile
-                  ? 'Waiting to be verified'
+              {provisional
+                ? 'Live on the network — provisionally active'
+                : live
+                  ? 'Live on the network'
                   : 'Your business is private'}
             </p>
             <p className="mt-0.5 text-text-secondary">
-              {live
-                ? 'Other businesses can find your storefront and send you connection requests.'
-                : profile
-                  ? "You've published a storefront, but it isn't visible to anyone else until it's verified. Nothing is lost while you wait — you can keep editing it."
+              {provisional
+                ? "You're listed and can start selling right now — buyers can find you, see your products, and send you requests. Verification comes later and raises your limits and your position in results; it isn't holding anything up."
+                : live
+                  ? 'Verified. Other businesses can find your storefront and send you connection requests.'
                   : 'Nobody outside your business can see anything about you. Publishing a storefront is the only thing that changes that, and it only lists the details you fill in below.'}
             </p>
           </div>
@@ -166,16 +178,53 @@ export function MyStorefrontPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex flex-wrap items-center gap-2">
-              Verification
-              <VerificationBadge verification={profile.verification} />
+              Your standing
+              <TrustTierBadge tier={profile.trust_tier} />
+              {profile.verification === 'verified' && (
+                <VerificationBadge verification={profile.verification} />
+              )}
             </CardTitle>
             <CardDescription>
-              Verification is a manual review. It exists so buyers on the network are dealing with
-              real businesses — which is also what makes your own listing worth something.
+              Standing is earned by trading well, not by paperwork alone. Buyers see the numbers
+              below and judge for themselves — there is no single score.
             </CardDescription>
           </CardHeader>
-          <CardContent>
+          <CardContent className="space-y-4">
             <TrustIndicators facts={profile} />
+
+            <ol className="space-y-2">
+              {(['provisional', 'verified', 'trusted', 'preferred'] as TrustTier[]).map((tier) => {
+                const reached =
+                  TIER_ORDER.indexOf(tier) <= TIER_ORDER.indexOf(profile.trust_tier)
+                return (
+                  <li
+                    key={tier}
+                    className={`flex items-start gap-2.5 rounded-lg border p-2.5 ${
+                      reached ? 'border-border bg-surface-muted/40' : 'border-dashed border-border'
+                    }`}
+                  >
+                    <span
+                      className={`mt-0.5 flex size-5 shrink-0 items-center justify-center rounded-full text-xs font-semibold ${
+                        reached
+                          ? 'bg-accent-primary/10 text-accent-primary'
+                          : 'bg-surface-muted text-text-muted'
+                      }`}
+                    >
+                      {TIER_ORDER.indexOf(tier) + 1}
+                    </span>
+                    <div className="min-w-0">
+                      <p className="text-sm font-medium text-text-primary">{TIER_LABELS[tier]}</p>
+                      <p className="text-xs text-text-secondary">{TIER_MEANING[tier]}</p>
+                    </div>
+                  </li>
+                )
+              })}
+            </ol>
+
+            <p className="text-xs text-text-muted">
+              Higher tiers raise your order limits and where you appear in results. Those limits
+              take effect alongside protected payment, which is still being built.
+            </p>
           </CardContent>
         </Card>
       )}
@@ -198,7 +247,7 @@ export function MyStorefrontPage() {
                 className="mt-1"
                 value={displayName}
                 onChange={(e) => setDisplayName(e.target.value)}
-                placeholder="e.g. Adeyemi Wholesale Foods"
+                placeholder="The name buyers will recognise"
                 disabled={!canManage}
               />
             </div>
@@ -213,7 +262,7 @@ export function MyStorefrontPage() {
                 rows={3}
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
-                placeholder="Dry goods, beverages, and household items. Delivery within Lagos."
+                placeholder="What you supply, and where you deliver."
                 disabled={!canManage}
               />
             </div>
@@ -227,7 +276,7 @@ export function MyStorefrontPage() {
                 className="mt-1"
                 value={location}
                 onChange={(e) => setLocation(e.target.value)}
-                placeholder="e.g. Ikeja, Lagos"
+                placeholder="City or area"
                 disabled={!canManage}
               />
             </div>
@@ -295,7 +344,7 @@ export function MyStorefrontPage() {
                 className="mt-1"
                 value={minOrderNote}
                 onChange={(e) => setMinOrderNote(e.target.value)}
-                placeholder="e.g. Minimum order ₦50,000 · delivery Mon–Fri"
+                placeholder="e.g. minimum order value, delivery days"
                 disabled={!canManage}
               />
             </div>

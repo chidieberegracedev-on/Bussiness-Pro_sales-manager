@@ -31,7 +31,7 @@ export type MarketplaceRow = Database['public']['Views']['v_marketplace_listings
  *
  * The view returns a row per LISTING; the marketplace shows a row per PRODUCT.
  * Grouping here rather than in SQL keeps the view a plain projection and means
- * "Indomie from four suppliers" is one card with four offers, not four cards
+ * one product sold by four suppliers is one card with four offers, not four
  * of the same thing — the entire reason the canonical catalog exists.
  */
 export interface MarketplaceProduct {

@@ -8,7 +8,7 @@ import {
   getTerminalId,
   readToken,
 } from '@/features/control/session-store'
-import type { MemberRole, SessionContext } from '@/types/database'
+import type { MemberRole, PinUnlockResult, SessionContext } from '@/types/database'
 
 export interface EmployeeOption {
   member_id: string
@@ -102,6 +102,50 @@ export function useRestoreSession() {
   }, [token])
 }
 
+/**
+ * A failed PIN is a RESULT, not an exception.
+ *
+ * 0026 had to make that change to fix the lockout: the old RPC incremented
+ * failed_count then raised, and the raise rolled the increment back, so the
+ * counter never moved and the promised 5-attempt lockout never once fired. A
+ * write can't survive a raise in the same transaction — so failure returns,
+ * and this throws a typed error the UI can read attempts_remaining off.
+ */
+export type PinFailure = Extract<PinUnlockResult, { ok: false }>
+
+export class PinError extends Error {
+  readonly result: PinFailure
+  /** toReadableError passes this message through verbatim — see lib/errors. */
+  readonly userFacing = true
+
+  constructor(result: PinFailure, message: string) {
+    super(message)
+    this.name = 'PinError'
+    this.result = result
+  }
+}
+
+export function pinErrorMessage(result: PinFailure): string {
+  switch (result.reason) {
+    case 'incorrect': {
+      const left = result.attempts_remaining
+      if (left === undefined) return 'That PIN is not correct.'
+      if (left === 0) return 'That PIN is not correct. This operator is now locked out.'
+      return `That PIN is not correct. ${left} ${left === 1 ? 'try' : 'tries'} left before a 15-minute lockout.`
+    }
+    case 'locked':
+      return 'Too many wrong PINs. Try again in 15 minutes, or ask an owner to reset it.'
+    case 'no_pin':
+      return 'No PIN has been set for this operator yet.'
+    case 'no_session':
+      return 'That session has ended. Choose your name to sign in again.'
+    case 'device_not_authenticated':
+      return 'This device is not signed in to the business.'
+    default:
+      return 'Could not sign in.'
+  }
+}
+
 export function usePinUnlock() {
   const { business } = useActiveBusiness()
   const setSession = useEmployeeSessionStore((s) => s.setSession)
@@ -123,17 +167,24 @@ export function usePinUnlock() {
         console.error('[pin_unlock] failed', { memberId: input.memberId, error })
         throw error
       }
-      const unlocked = data as unknown as { token: string; member_id: string; role: MemberRole }
+
+      const result = data as unknown as PinUnlockResult
+      if (!result.ok) {
+        // Not an exception on the server — the failed attempt had to commit for
+        // the lockout counter to work. Surfaced as one here so the caller's
+        // onError path is unchanged.
+        throw new PinError(result, pinErrorMessage(result))
+      }
 
       // Resolve the full context server-side rather than assembling it here.
       const { data: ctx, error: ctxError } = await supabase.rpc('session_context', {
-        p_token: unlocked.token,
+        p_token: result.token,
       })
       if (ctxError || !ctx) {
         console.error('[session_context] failed after unlock', ctxError)
         throw ctxError ?? new Error('Could not load the session.')
       }
-      return { token: unlocked.token, context: ctx as unknown as SessionContext }
+      return { token: result.token, context: ctx as unknown as SessionContext }
     },
     onSuccess: ({ token, context }) => {
       setSession(token, context)
@@ -143,6 +194,15 @@ export function usePinUnlock() {
   })
 }
 
+/**
+ * Re-entry after a lock.
+ *
+ * Uses unlock_session, not pin_unlock: the operator is already bound to the
+ * locked session, so re-validating their PIN should reactivate THAT session.
+ * pin_unlock always mints a new one, which is why the lock screen used to
+ * force the operator to go back and re-pick their name — and why a held
+ * basket attached to the old session went with it.
+ */
 export function useResumeSession() {
   const setSession = useEmployeeSessionStore((s) => s.setSession)
 
@@ -150,15 +210,27 @@ export function useResumeSession() {
     mutationFn: async (pin: string) => {
       const token = readToken()
       if (!token) throw new Error('No session to resume.')
-      const { data, error } = await supabase.rpc('pin_resume_session', {
+
+      const { data, error } = await supabase.rpc('unlock_session', {
         p_token: token,
         p_pin: pin,
       })
       if (error) {
-        console.error('[pin_resume_session] failed', error)
+        console.error('[unlock_session] failed', error)
         throw error
       }
-      return { token, context: data as unknown as SessionContext }
+
+      const result = data as unknown as PinUnlockResult
+      if (!result.ok) throw new PinError(result, pinErrorMessage(result))
+
+      const { data: ctx, error: ctxError } = await supabase.rpc('session_context', {
+        p_token: result.token,
+      })
+      if (ctxError || !ctx) {
+        console.error('[session_context] failed after unlock_session', ctxError)
+        throw ctxError ?? new Error('Could not load the session.')
+      }
+      return { token: result.token, context: ctx as unknown as SessionContext }
     },
     onSuccess: ({ token, context }) => setSession(token, context),
   })
