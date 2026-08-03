@@ -9,6 +9,7 @@ import {
   Info,
   Eye,
   Lock,
+  Package,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
@@ -128,11 +129,18 @@ export function MyStorefrontPage() {
         description="Publish a storefront so other businesses can find what you supply. Your own costs, margins, and stock are never part of it."
         actions={
           live && profile ? (
-            <Button variant="outline" asChild>
-              <Link to={`/network/suppliers/${profile.id}`}>
-                <Eye className="size-4" /> View as buyers see it
-              </Link>
-            </Button>
+            <div className="flex flex-wrap gap-2">
+              <Button variant="outline" asChild>
+                <Link to={`/network/suppliers/${profile.id}`}>
+                  <Eye className="size-4" /> View as buyers see it
+                </Link>
+              </Button>
+              <Button asChild>
+                <Link to="/network/my-listings">
+                  <Package className="size-4" /> What I sell
+                </Link>
+              </Button>
+            </div>
           ) : undefined
         }
       />
@@ -352,6 +360,27 @@ export function MyStorefrontPage() {
             <Button variant="outline" onClick={saveContact} disabled={!canManage || update.isPending}>
               {update.isPending && <Loader2 className="size-4 animate-spin" />}
               Save contact details
+            </Button>
+          </CardContent>
+        </Card>
+      )}
+
+      {profile && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Package className="size-5" /> Your products
+            </CardTitle>
+            <CardDescription>
+              A storefront with nothing in it can't be bought from. List what you sell and set a
+              price for each quantity.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Button asChild>
+              <Link to="/network/my-listings">
+                <Package className="size-4" /> Manage what I sell
+              </Link>
             </Button>
           </CardContent>
         </Card>

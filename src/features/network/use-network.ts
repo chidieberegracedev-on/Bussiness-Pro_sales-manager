@@ -3,7 +3,12 @@ import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import Decimal from 'decimal.js'
 import { supabase } from '@/lib/supabase'
 import { useActiveBusiness } from '@/features/business/hooks'
-import type { ConnectStatus, Database, SupplierVerification } from '@/types/database'
+import type {
+  ConnectStatus,
+  Database,
+  ListingStatus,
+  SupplierVerification,
+} from '@/types/database'
 
 export type SupplierProfile = Database['public']['Tables']['supplier_profiles']['Row']
 export type SupplierListing = Database['public']['Tables']['supplier_listings']['Row']
@@ -555,4 +560,157 @@ export const CONNECT_LABELS: Record<ConnectStatus, string> = {
   accepted: 'Connected',
   declined: 'Declined',
   revoked: 'Disconnected',
+}
+
+// ---------------------------------------------------------------------------
+// Listing management — the supplier's side of the marketplace
+//
+// Writes go straight to the tables rather than through an RPC: 0024 gives
+// supplier_listings and listing_price_tiers owner-restricted write policies,
+// so RLS is the enforcement and there is nothing extra for a function to
+// check. Every write carries business_id because both policies key off it.
+// ---------------------------------------------------------------------------
+
+export function useMyListings() {
+  const { data: profile } = useMySupplierProfile()
+  return useSupplierListings(profile?.id)
+}
+
+export function useCreateListing() {
+  const { business } = useActiveBusiness()
+  const { data: profile } = useMySupplierProfile()
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (input: {
+      canonicalProductId: string
+      supplierProductName?: string | null
+      purchaseUnit: string
+      conversionToBase: string
+      minOrderQty: string
+      availability?: ListingStatus
+    }) => {
+      if (!profile) throw new Error('Publish your storefront before listing products.')
+      const { data, error } = await supabase
+        .from('supplier_listings')
+        .insert({
+          supplier_profile_id: profile.id,
+          business_id: business!.id,
+          canonical_product_id: input.canonicalProductId,
+          supplier_product_name: input.supplierProductName?.trim() || null,
+          purchase_unit: input.purchaseUnit.trim() || 'unit',
+          conversion_to_base: input.conversionToBase || '1',
+          min_order_qty: input.minOrderQty || '1',
+          availability: input.availability ?? 'active',
+          // The supplier quotes in their own currency, not the buyer's.
+          currency_code: business!.currency_code,
+        })
+        .select()
+        .single()
+      if (error) {
+        console.error('[supplier_listings.insert] failed', { input, error })
+        throw error
+      }
+      return data as SupplierListing
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['supplier-listings'] })
+      qc.invalidateQueries({ queryKey: ['marketplace'] })
+    },
+  })
+}
+
+export function useUpdateListing() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (patch: Partial<SupplierListing> & { id: string }) => {
+      const { id, ...rest } = patch
+      const { error } = await supabase.from('supplier_listings').update(rest).eq('id', id)
+      if (error) {
+        console.error('[supplier_listings.update] failed', { patch, error })
+        throw error
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['supplier-listings'] })
+      qc.invalidateQueries({ queryKey: ['marketplace'] })
+    },
+  })
+}
+
+export function useDeleteListing() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('supplier_listings').delete().eq('id', id)
+      if (error) {
+        console.error('[supplier_listings.delete] failed', { id, error })
+        throw error
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['supplier-listings'] })
+      qc.invalidateQueries({ queryKey: ['marketplace'] })
+    },
+  })
+}
+
+/**
+ * A price break. Inserting one also records it in listing_price_history via
+ * the 0025 trigger, which is what a price trend is later derived from.
+ */
+export function useAddPriceTier() {
+  const { business } = useActiveBusiness()
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (input: {
+      listingId: string
+      minQty: string
+      maxQty?: string | null
+      unitPrice: string
+    }) => {
+      const { error } = await supabase.from('listing_price_tiers').insert({
+        listing_id: input.listingId,
+        business_id: business!.id,
+        min_qty: input.minQty || '1',
+        max_qty: input.maxQty?.trim() ? input.maxQty : null,
+        unit_price: input.unitPrice,
+      })
+      if (error) {
+        console.error('[listing_price_tiers.insert] failed', { input, error })
+        throw error
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['supplier-listings'] })
+      qc.invalidateQueries({ queryKey: ['marketplace'] })
+    },
+  })
+}
+
+export function useDeletePriceTier() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from('listing_price_tiers').delete().eq('id', id)
+      if (error) {
+        console.error('[listing_price_tiers.delete] failed', { id, error })
+        throw error
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['supplier-listings'] })
+      qc.invalidateQueries({ queryKey: ['marketplace'] })
+    },
+  })
+}
+
+export const LISTING_STATUS_LABELS: Record<ListingStatus, string> = {
+  active: 'For sale',
+  out_of_stock: 'Out of stock',
+  hidden: 'Hidden',
 }

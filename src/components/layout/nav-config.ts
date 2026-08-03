@@ -81,6 +81,7 @@ export const NAV_ITEMS: NavItem[] = [
       { label: 'Marketplace', to: '/network', icon: Globe },
       { label: 'Connections', to: '/network/connections', icon: Link2 },
       { label: 'My storefront', to: '/network/my-profile', icon: Store },
+      { label: 'What I sell', to: '/network/my-listings', icon: Package },
     ],
   },
   {

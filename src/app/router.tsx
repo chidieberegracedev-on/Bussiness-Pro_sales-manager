@@ -51,6 +51,7 @@ import { MarketplacePage } from '@/features/network/marketplace-page'
 import { SupplierProfilePage } from '@/features/network/supplier-profile-page'
 import { MyStorefrontPage } from '@/features/network/my-storefront-page'
 import { ConnectionsPage } from '@/features/network/connections-page'
+import { MyListingsPage } from '@/features/network/my-listings-page'
 import { EmployeeDirectoryPage } from '@/features/control/employee-directory'
 import { SettingsPermissionsPage } from '@/features/control/settings-permissions'
 import { LiveShiftsPage } from '@/features/control/live-shifts-page'
@@ -139,6 +140,7 @@ export function AppRouter() {
             <Route path="/network/suppliers/:id" element={<SupplierProfilePage />} />
             <Route element={<RequireRole roles={[...MANAGE_ROLES]} />}>
               <Route path="/network/my-profile" element={<MyStorefrontPage />} />
+              <Route path="/network/my-listings" element={<MyListingsPage />} />
               <Route path="/network/connections" element={<ConnectionsPage />} />
             </Route>
 
