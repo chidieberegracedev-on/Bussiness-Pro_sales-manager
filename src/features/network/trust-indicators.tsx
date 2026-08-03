@@ -41,13 +41,29 @@ const TIER_VARIANT: Record<TrustTier, 'muted' | 'success' | 'info'> = {
  * colour — being new is not a fault, and colouring it as one would push every
  * buyer away from exactly the suppliers the network needs to attract.
  */
-export function TrustTierBadge({ tier, className }: { tier: TrustTier; className?: string }) {
-  const Icon = TIER_ICON[tier]
+export function TrustTierBadge({
+  tier,
+  className,
+}: {
+  tier: TrustTier | null | undefined
+  className?: string
+}) {
+  // Never index straight off a server value. Before 0027 is applied the view
+  // has no trust_tier column at all, so this arrives undefined — and an
+  // undefined icon component is a render-time throw that blanks the screen,
+  // not a missing badge.
+  const safe = normaliseTier(tier)
+  const Icon = TIER_ICON[safe]
   return (
-    <Badge variant={TIER_VARIANT[tier]} className={className} title={TIER_MEANING[tier]}>
-      <Icon className="size-3.5" aria-hidden="true" /> {TIER_LABELS[tier]}
+    <Badge variant={TIER_VARIANT[safe]} className={className} title={TIER_MEANING[safe]}>
+      <Icon className="size-3.5" aria-hidden="true" /> {TIER_LABELS[safe]}
     </Badge>
   )
+}
+
+/** Anything unrecognised is treated as the lowest tier, never as a crash. */
+export function normaliseTier(tier: TrustTier | null | undefined): TrustTier {
+  return tier && tier in TIER_LABELS ? tier : 'provisional'
 }
 
 /**

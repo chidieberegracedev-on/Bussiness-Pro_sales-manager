@@ -192,7 +192,7 @@ export function ExpensesPage() {
                 </TableHeader>
                 <TableBody>
                   {expenses.map((e) => {
-                    const Icon = SOURCE_ICONS[e.paid_from]
+                    const Icon = SOURCE_ICONS[e.paid_from] ?? Wallet
                     return (
                       <TableRow key={e.id}>
                         <TableCell className="text-sm text-text-secondary">

@@ -25,6 +25,7 @@ import {
   TrustIndicators,
   TIER_LABELS,
   TIER_MEANING,
+  normaliseTier,
 } from '@/features/network/trust-indicators'
 import type { TrustTier } from '@/types/database'
 import { useActiveBusiness } from '@/features/business/hooks'
@@ -195,7 +196,7 @@ export function MyStorefrontPage() {
             <ol className="space-y-2">
               {(['provisional', 'verified', 'trusted', 'preferred'] as TrustTier[]).map((tier) => {
                 const reached =
-                  TIER_ORDER.indexOf(tier) <= TIER_ORDER.indexOf(profile.trust_tier)
+                  TIER_ORDER.indexOf(tier) <= TIER_ORDER.indexOf(normaliseTier(profile.trust_tier))
                 return (
                   <li
                     key={tier}

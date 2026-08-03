@@ -29,6 +29,7 @@ import {
   TrustTierBadge,
   TrustIndicators,
   TIER_MEANING,
+  normaliseTier,
 } from '@/features/network/trust-indicators'
 import { BuyerProtectionNotice } from '@/features/network/buyer-protection'
 import { useActiveBusiness } from '@/features/business/hooks'
@@ -114,7 +115,7 @@ export function SupplierProfilePage() {
                 <VerificationBadge verification={profile.verification} />
               )}
             </div>
-            <p className="mt-1 text-xs text-text-muted">{TIER_MEANING[profile.trust_tier]}</p>
+            <p className="mt-1 text-xs text-text-muted">{TIER_MEANING[normaliseTier(profile.trust_tier)]}</p>
             {profile.location_text && (
               <p className="mt-0.5 flex items-center gap-1.5 text-sm text-text-secondary">
                 <MapPin className="size-3.5 text-text-muted" /> {profile.location_text}

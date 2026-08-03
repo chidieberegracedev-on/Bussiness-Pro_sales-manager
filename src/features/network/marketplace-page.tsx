@@ -30,7 +30,12 @@ import {
   type MarketplaceProduct,
   type MarketplaceRow,
 } from '@/features/network/use-network'
-import { TrustTierBadge, TrustIndicators, TIER_LABELS } from '@/features/network/trust-indicators'
+import {
+  TrustTierBadge,
+  TrustIndicators,
+  TIER_LABELS,
+  normaliseTier,
+} from '@/features/network/trust-indicators'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { toast } from '@/hooks/use-toast'
 import { toReadableError } from '@/lib/errors'
@@ -102,7 +107,7 @@ export function MarketplacePage() {
         <StatTile icon={Store} value={String(stats.suppliers)} label="Suppliers" />
         <StatTile
           icon={ShieldCheck}
-          value={myProfile?.is_public ? TIER_LABELS[myProfile.trust_tier] : '—'}
+          value={myProfile?.is_public ? TIER_LABELS[normaliseTier(myProfile.trust_tier)] : '—'}
           label="Your storefront"
           to="/network/my-profile"
         />

@@ -76,7 +76,7 @@ export function OperatorSelectionScreen({ onOwnerAdmin }: { onOwnerAdmin?: () =>
       cashier: 3,
     }
     return [...(members ?? [])].sort(
-      (a, b) => rank[a.role] - rank[b.role] || a.display_name.localeCompare(b.display_name),
+      (a, b) => (rank[a.role] ?? 9) - (rank[b.role] ?? 9) || a.display_name.localeCompare(b.display_name),
     )
   }, [members])
 
@@ -298,12 +298,15 @@ function OperatorAvatar({
   role: MemberRole
   size?: 'md' | 'lg'
 }) {
-  const Icon = ROLE_ICONS[role]
+  // A role the frontend does not know yet (a new enum value in the database)
+  // must not blank the sign-in screen — it is the one page nobody can route
+  // around.
+  const Icon = ROLE_ICONS[role] ?? UserRound
   return (
     <span
       className={cn(
         'relative flex shrink-0 items-center justify-center rounded-full font-semibold',
-        ROLE_TINTS[role],
+        ROLE_TINTS[role] ?? 'bg-surface-muted text-text-muted',
         size === 'lg' ? 'mx-auto size-14 text-lg' : 'size-10 text-sm',
       )}
     >

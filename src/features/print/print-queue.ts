@@ -102,7 +102,23 @@ export function useUpdatePrintJob() {
  * adapter can later render the same payload completely differently.
  */
 export function renderJob(job: PrintJob): RenderedDocument {
-  const payload = job.payload as Record<string, unknown>
+  // Called during render to label a queued job, so it must never throw: a row
+  // written by an older build, or with a payload that doesn't match its
+  // job_type, would otherwise take the whole page down with it.
+  try {
+    return renderJobUnsafe(job)
+  } catch (error) {
+    console.error('[renderJob] malformed payload', { id: job.id, type: job.job_type, error })
+    return {
+      html: '<!doctype html><html><body><p>This job could not be rendered.</p></body></html>',
+      medium: 'a4',
+      title: 'Unreadable job',
+    }
+  }
+}
+
+function renderJobUnsafe(job: PrintJob): RenderedDocument {
+  const payload = (job.payload ?? {}) as Record<string, unknown>
   const medium = (payload.medium as PrintMediumHint | undefined) ?? undefined
 
   switch (job.job_type) {

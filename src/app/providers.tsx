@@ -4,6 +4,7 @@ import { TooltipProvider } from '@/components/ui/tooltip'
 import { Toaster } from '@/components/ui/toaster'
 import { AuthProvider } from '@/features/auth/auth-provider'
 import { ScanEngineProvider } from '@/features/scan/scan-engine'
+import { ErrorBoundary } from '@/app/error-boundary'
 
 export const queryClient = new QueryClient({
   defaultOptions: {
@@ -22,7 +23,11 @@ export function AppProviders({ children }: { children: ReactNode }) {
         <TooltipProvider delayDuration={200}>
           {/* One capture layer for the whole app. Screens subscribe to resolved
               scans; nothing else listens to the keyboard for barcodes. */}
-          <ScanEngineProvider>{children}</ScanEngineProvider>
+          {/* Last line of defence. A render throw below this shows a message
+              instead of a white page. */}
+          <ErrorBoundary>
+            <ScanEngineProvider>{children}</ScanEngineProvider>
+          </ErrorBoundary>
           <Toaster />
         </TooltipProvider>
       </AuthProvider>

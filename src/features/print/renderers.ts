@@ -67,8 +67,8 @@ td{padding:1px 0;vertical-align:top}
 `
 }
 
-function esc(value: string): string {
-  return value
+function esc(value: unknown): string {
+  return String(value ?? '')
     .replace(/&/g, '&amp;')
     .replace(/</g, '&lt;')
     .replace(/>/g, '&gt;')
@@ -84,14 +84,19 @@ export function renderReceipt(
   payload: ReceiptPayload,
   medium: PrintMedium = 'receipt-80mm',
 ): RenderedDocument {
-  const lines = payload.lines
+  // A job row is stored data — it may predate a payload change, or come from
+  // a version of the app that wrote a different shape. Renderers therefore
+  // treat every field as optional. They used to assume the shape and throw,
+  // and because renderJob() is called during render, one malformed row took
+  // the whole screen down.
+  const lines = (payload.lines ?? [])
     .map(
       (l) =>
         `<tr><td class="qty">${esc(l.qty)}×</td><td>${esc(l.name)}</td><td class="amt">${esc(l.amount)}</td></tr>`,
     )
     .join('')
 
-  const payments = payload.payments
+  const payments = (payload.payments ?? [])
     .map(
       (p) =>
         `<tr class="pay"><td colspan="2">${esc(p.method)}</td><td class="amt">${esc(p.amount)}</td></tr>`,
@@ -99,9 +104,9 @@ export function renderReceipt(
     .join('')
 
   const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(payload.receiptNumber)}</title><style>${receiptCss(medium)}</style></head><body>
-<h1>${esc(payload.businessName)}</h1>
+<h1>${esc(payload.businessName ?? '')}</h1>
 <div class="meta">
-  ${esc(payload.receiptNumber)}<br/>${esc(payload.occurredAt)}
+  ${esc(payload.receiptNumber ?? '')}<br/>${esc(payload.occurredAt ?? '')}
   ${payload.operator ? `<br/>Served by ${esc(payload.operator)}` : ''}
   ${payload.terminal ? ` · ${esc(payload.terminal)}` : ''}
   ${payload.shiftRef ? `<br/>Shift ${esc(payload.shiftRef)}` : ''}
@@ -124,7 +129,7 @@ ${payload.qrSvg ? `<div class="qr">${payload.qrSvg}</div><div class="center smal
 ${payload.footer ? `<div class="center small" style="margin-top:6px">${esc(payload.footer)}</div>` : ''}
 </body></html>`
 
-  return { html, medium, title: payload.receiptNumber }
+  return { html, medium, title: payload.receiptNumber ?? 'Receipt' }
 }
 
 /**
@@ -133,12 +138,12 @@ ${payload.footer ? `<div class="center small" style="margin-top:6px">${esc(paylo
  * barcode that would scan as something else.
  */
 export function renderLabels(
-  labels: LabelPayload[],
+  labels: LabelPayload[] | undefined,
   medium: PrintMedium = 'label-50x25',
 ): RenderedDocument {
   const size = medium === 'label-40x30' ? { w: 40, h: 30 } : { w: 50, h: 25 }
 
-  const cells = labels
+  const cells = (labels ?? [])
     .map((label) => {
       const svg = label.code ? code128Svg(label.code, { width: 150, height: 28 }) : null
       return `<div class="label">
@@ -165,7 +170,8 @@ body{width:${size.w}mm}
 .extra{font-size:6.5px;color:#333}
 </style></head><body>${cells}</body></html>`
 
-  return { html, medium, title: `${labels.length} label${labels.length === 1 ? '' : 's'}` }
+  const count = (labels ?? []).length
+  return { html, medium, title: `${count} label${count === 1 ? '' : 's'}` }
 }
 
 export interface ReportPayload {
@@ -178,12 +184,12 @@ export interface ReportPayload {
 
 /** Variance and count reports — A4, because these get filed, not stuck on a shelf. */
 export function renderReport(payload: ReportPayload): RenderedDocument {
-  const head = payload.columns.map((c) => `<th>${esc(c)}</th>`).join('')
-  const body = payload.rows
-    .map((r) => `<tr>${r.map((cell) => `<td>${esc(cell)}</td>`).join('')}</tr>`)
+  const head = (payload.columns ?? []).map((c) => `<th>${esc(c)}</th>`).join('')
+  const body = (payload.rows ?? [])
+    .map((r) => `<tr>${(r ?? []).map((cell) => `<td>${esc(cell)}</td>`).join('')}</tr>`)
     .join('')
 
-  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(payload.title)}</title><style>
+  const html = `<!doctype html><html><head><meta charset="utf-8"><title>${esc(payload.title ?? 'Document')}</title><style>
 ${BASE_CSS}
 @page{size:A4;margin:14mm}
 body{font-size:11px}
@@ -196,11 +202,11 @@ td:not(:first-child){text-align:right;font-variant-numeric:tabular-nums}
 th:not(:first-child){text-align:right}
 .foot{margin-top:10px;color:#444;font-size:10px}
 </style></head><body>
-<h1>${esc(payload.title)}</h1>
+<h1>${esc(payload.title ?? 'Document')}</h1>
 ${payload.subtitle ? `<div class="sub">${esc(payload.subtitle)}</div>` : ''}
 <table><thead><tr>${head}</tr></thead><tbody>${body}</tbody></table>
 ${payload.footNote ? `<div class="foot">${esc(payload.footNote)}</div>` : ''}
 </body></html>`
 
-  return { html, medium: 'a4', title: payload.title }
+  return { html, medium: 'a4', title: payload.title ?? 'Document' }
 }
