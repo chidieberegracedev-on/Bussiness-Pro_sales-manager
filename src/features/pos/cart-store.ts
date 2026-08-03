@@ -8,6 +8,8 @@ export interface CartLine {
   baseUnit: string
   /** Display only — server re-reads the authoritative price at completion (BR-S1.4). */
   unitPrice: Decimal
+  /** Storage path for the cart thumbnail. Null for scanned items. */
+  imagePath?: string | null
   quantity: Decimal
   /** Minted when the line is added, kept stable across quantity edits (BR-S5.3). */
   movementId: string
@@ -20,7 +22,7 @@ interface CartState {
   /** Increments on every addLine call, including a merge that doesn't change lines.length — lets the picker refocus its search bar after every add, not just the first per variant. */
   addedCount: number
   /** `quantity` defaults to 1; a carton barcode passes its units_per_scan (Phase 10). */
-  addLine: (item: { variantId: string; productName: string; variantName: string | null; baseUnit: string; unitPrice: Decimal; quantity?: Decimal }) => void
+  addLine: (item: { variantId: string; productName: string; variantName: string | null; baseUnit: string; unitPrice: Decimal; quantity?: Decimal; imagePath?: string | null }) => void
   removeLine: (variantId: string) => void
   setQuantity: (variantId: string, quantity: Decimal) => void
   /** Replaces the basket wholesale — used when resuming a held basket. */

@@ -270,8 +270,8 @@ export function RegistryWorkspace() {
           </div>
         </div>
 
-        <div className="hidden min-h-0 w-96 shrink-0 flex-col gap-3 lg:flex">
-          <div className="min-h-0 flex-1 rounded-lg border border-border bg-surface p-4">
+        <div className="hidden min-h-0 w-[340px] shrink-0 flex-col gap-3 lg:flex">
+          <div className="min-h-0 flex-1 rounded-xl border border-border bg-card p-4">
             <CartPanel
               onTakePayment={() => setPaymentOpen(true)}
               onRemoveLine={voidLine}

@@ -33,7 +33,7 @@ export function PosPage() {
       </div>
 
       {/* Desktop: persistent cart pane */}
-      <div className="hidden min-h-0 w-96 shrink-0 rounded-lg border border-border bg-surface p-4 lg:block">
+      <div className="hidden min-h-0 w-[340px] shrink-0 rounded-xl border border-border bg-card p-4 lg:block">
         <CartPanel onTakePayment={handleTakePayment} />
       </div>
 

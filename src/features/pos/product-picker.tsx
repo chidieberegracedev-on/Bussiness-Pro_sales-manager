@@ -33,6 +33,7 @@ function VariantSelector({ product }: { product: GroupedProduct }) {
               variantName: variantLabel(v),
               baseUnit: product.baseUnit,
               unitPrice: new Decimal(v.selling_price),
+              imagePath: product.imagePath,
             })
           }
           className="flex w-full items-center justify-between gap-3 rounded-md px-2 py-2 text-left text-sm hover:bg-surface-muted"
@@ -57,36 +58,50 @@ function ProductTile({ product, imageUrl }: { product: GroupedProduct; imageUrl:
       variantName: null,
       baseUnit: product.baseUnit,
       unitPrice: new Decimal(only.selling_price),
+      imagePath: product.imagePath,
     })
   }
 
   const tileContent = (
     <div
       className={cn(
-        // No padding around the image: it runs to the card edge, and only the
-        // text below is inset. That single change is most of what separates a
-        // designed tile from a boxed one.
-        'flex flex-col overflow-hidden rounded-lg border border-border bg-card text-left transition-colors hover:border-border-strong',
+        // A card is a fixed box. Everything inside reflows within it — the card
+        // width drives the content, never the other way round, which is what
+        // stops a long price or a badge escaping when the cart panel expands.
+        'flex h-full w-full min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition-colors hover:border-border-strong',
         !product.isActive && 'opacity-60',
       )}
     >
-      <div className="flex aspect-square items-center justify-center bg-surface-muted">
+      <div className="flex aspect-[4/3] w-full shrink-0 items-center justify-center overflow-hidden bg-surface-muted">
         {imageUrl ? (
-          <img src={imageUrl} alt="" className="size-full object-cover" />
+          <img src={imageUrl} alt="" className="size-full object-cover" loading="lazy" />
         ) : (
           <Package className="size-8 text-text-muted" />
         )}
       </div>
-      <div className="p-2.5">
-        <p className="line-clamp-2 text-sm font-semibold leading-snug text-text-primary">
+
+      <div className="flex min-w-0 flex-1 flex-col gap-1 p-2.5">
+        {/* One line, always. A two-line name on one card and one on the next is
+            what made the rows sit at different heights. */}
+        <p className="truncate text-sm font-semibold leading-snug text-text-primary">
           {product.productName}
         </p>
-        <div className="mt-1 flex items-center justify-between gap-2">
-          <span className="text-sm font-semibold text-accent-primary">
+        <p className="truncate text-xs text-text-muted">
+          {product.hasVariants
+            ? `${product.variants.length} options`
+            : (product.variants[0]?.sku ?? product.baseUnit)}
+        </p>
+
+        {/* min-w-0 on both children is the fix for the pop-out: without it a
+            flex child refuses to shrink below its content and overflows. */}
+        <div className="mt-auto flex min-w-0 items-center justify-between gap-1.5 pt-1">
+          <span className="min-w-0 truncate text-[clamp(0.75rem,1.1vw,0.875rem)] font-semibold text-accent-primary">
             <Money value={product.priceMin} />
             {product.priceMin !== product.priceMax && '+'}
           </span>
-          <StockStatusBadge status={product.worstStatus} />
+          <span className="shrink-0">
+            <StockStatusBadge status={product.worstStatus} />
+          </span>
         </div>
       </div>
     </div>
@@ -96,7 +111,7 @@ function ProductTile({ product, imageUrl }: { product: GroupedProduct; imageUrl:
     return (
       <Popover>
         <PopoverTrigger asChild>
-          <button type="button" className="w-full">
+          <button type="button" className="h-full w-full">
             {tileContent}
           </button>
         </PopoverTrigger>
@@ -109,7 +124,7 @@ function ProductTile({ product, imageUrl }: { product: GroupedProduct; imageUrl:
   }
 
   return (
-    <button type="button" className="w-full" onClick={handleSimpleAdd}>
+    <button type="button" className="h-full w-full" onClick={handleSimpleAdd}>
       {tileContent}
     </button>
   )
@@ -189,7 +204,7 @@ export function ProductPicker() {
           />
         )}
         {!isLoading && !isError && products && products.length > 0 && (
-          <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 xl:grid-cols-4">
+          <div className="grid auto-rows-fr grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
             {products.map((product) => (
               <ProductTile
                 key={product.productId}

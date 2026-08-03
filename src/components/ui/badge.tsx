@@ -3,7 +3,10 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const badgeVariants = cva(
-  'inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors',
+  // shrink-0 + whitespace-nowrap: a badge is a fixed token, not a paragraph.
+  // Without these it collapses under flex pressure and stacks its icon above
+  // its label, which is what it was doing inside product cards.
+  'inline-flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-2.5 py-0.5 text-xs font-medium transition-colors [&>svg]:shrink-0',
   {
     variants: {
       variant: {
