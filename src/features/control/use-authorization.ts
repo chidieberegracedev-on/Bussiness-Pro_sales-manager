@@ -234,11 +234,17 @@ export function useSeedPermissionLimits() {
       const { error } = await supabase.rpc('seed_permission_limits', {
         p_business_id: business!.id,
       })
-      if (error) throw error
+      if (error) {
+        console.error('[seed_permission_limits] failed', error)
+        throw error
+      }
       const { error: staffError } = await supabase.rpc('seed_inventory_staff_limits', {
         p_business_id: business!.id,
       })
-      if (staffError) throw staffError
+      if (staffError) {
+        console.error('[seed_inventory_staff_limits] failed', staffError)
+        throw staffError
+      }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['permission-limits', business?.id] }),
   })

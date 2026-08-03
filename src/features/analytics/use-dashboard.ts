@@ -27,7 +27,10 @@ export function useDashboardSummary() {
       const { data, error } = await supabase.rpc('dashboard_summary', {
         p_business_id: business!.id,
       })
-      if (error) throw error
+      if (error) {
+        console.error('[dashboard_summary] failed', error)
+        throw error
+      }
       return data as unknown as DashboardData
     },
     enabled: !!business,
@@ -54,7 +57,10 @@ export function useSalesTimeseries(from: string, to: string, bucket: 'day' | 'ho
         p_to: to,
         p_bucket: bucket,
       })
-      if (error) throw error
+      if (error) {
+        console.error('[sales_timeseries] failed', error)
+        throw error
+      }
       return (data ?? []) as unknown as TimeseriesPoint[]
     },
     enabled: !!business && !!from && !!to,

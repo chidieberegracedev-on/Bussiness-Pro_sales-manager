@@ -35,7 +35,10 @@ export function useVoidSale() {
   return useMutation({
     mutationFn: async ({ saleId, reason }: { saleId: string; reason?: string | null }) => {
       const { data, error } = await supabase.rpc('void_sale', { p_sale_id: saleId, p_reason: reason ?? null })
-      if (error) throw error
+      if (error) {
+        console.error('[void_sale] failed', error)
+        throw error
+      }
       return data
     },
     onSuccess: (_data, variables) => {

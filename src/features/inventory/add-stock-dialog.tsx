@@ -105,6 +105,7 @@ function AddStockForm({ context, onDone }: { context: StockDialogContext; onDone
       p_note: values.note || null,
     })
 
+    if (error) console.error('[record_stock_movement] failed', error)
     if (error) {
       setServerError(toReadableError(error))
       return

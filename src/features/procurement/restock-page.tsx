@@ -21,6 +21,7 @@ import { useActiveBusiness } from '@/features/business/hooks'
 import { toast } from '@/hooks/use-toast'
 import { toReadableError } from '@/lib/errors'
 import { cn } from '@/lib/utils'
+import { FindSuppliersLink } from '@/features/network/find-suppliers-link'
 
 interface RowState {
   selected: boolean
@@ -199,6 +200,9 @@ export function RestockPage() {
                               {row.variant_name && (
                                 <p className="text-xs text-text-muted">{row.variant_name}</p>
                               )}
+                              {/* Only appears for items linked to the shared
+                                  catalog — see FindSuppliersLink. */}
+                              <FindSuppliersLink variantId={row.variant_id} />
                             </td>
                             <td className="py-2.5 pr-3 text-text-secondary">
                               <p>

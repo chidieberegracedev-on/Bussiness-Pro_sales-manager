@@ -5,6 +5,7 @@ import { useRecentMovements } from '@/features/inventory/use-movements'
 import { useStockDialogStore } from '@/features/inventory/stock-dialog-store'
 import { variantLabel } from '@/features/products/types'
 import { BarcodeManager } from '@/features/scan/barcode-manager'
+import { CanonicalLink } from '@/features/network/canonical-link'
 import { useActiveBusiness } from '@/features/business/hooks'
 import { useCategories } from '@/features/products/categories-hooks'
 import { PRODUCT_IMAGE_BUCKET } from '@/lib/storage-buckets'
@@ -148,6 +149,22 @@ export function ProductDetailPage() {
               variantId={variants[0].variant_id}
               baseUnit={product.base_unit}
               primaryBarcode={variants[0].barcode}
+            />
+          </CardContent>
+        </Card>
+      )}
+
+      {isSimple && variants && variants.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Shared catalog</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <CanonicalLink
+              variantId={variants[0].variant_id}
+              variantName={product.name}
+              barcode={variants[0].barcode}
+              baseUnit={product.base_unit}
             />
           </CardContent>
         </Card>

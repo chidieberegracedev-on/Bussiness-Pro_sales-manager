@@ -27,6 +27,9 @@ import {
   Scale,
   ShieldQuestion,
   ClipboardList,
+  Globe,
+  Link2,
+  Store,
 } from 'lucide-react'
 import type { MemberRole } from '@/types/database'
 
@@ -67,6 +70,17 @@ export const NAV_ITEMS: NavItem[] = [
       { label: 'Suppliers', to: '/suppliers', icon: Truck },
       { label: 'Restock', to: '/restock', icon: Repeat, roles: BACKROOM },
       { label: 'Purchase History', to: '/purchase-history', icon: History },
+    ],
+  },
+  {
+    label: 'Network',
+    to: '/network',
+    icon: Globe,
+    roles: MANAGEMENT,
+    children: [
+      { label: 'Marketplace', to: '/network', icon: Globe },
+      { label: 'Connections', to: '/network/connections', icon: Link2 },
+      { label: 'My storefront', to: '/network/my-profile', icon: Store },
     ],
   },
   {

@@ -151,6 +151,7 @@ export function CreateProductPage() {
     })
 
     if (error || !data) {
+      console.error('[create_product] failed', error)
       setServerError(toReadableError(error))
       return
     }

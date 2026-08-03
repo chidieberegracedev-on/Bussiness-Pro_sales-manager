@@ -24,7 +24,10 @@ export function useInsights() {
       const { data, error } = await supabase.rpc('business_insights', {
         p_business_id: business!.id,
       })
-      if (error) throw error
+      if (error) {
+        console.error('[business_insights] failed', error)
+        throw error
+      }
       return (data ?? []) as unknown as Insight[]
     },
     enabled: !!business,

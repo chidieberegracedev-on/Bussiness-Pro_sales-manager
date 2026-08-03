@@ -69,6 +69,116 @@ export type InsightCategory = 'sales' | 'expenses' | 'margin' | 'stock' | 'cash'
 export interface Database {
   public: {
     Tables: {
+      canonical_products: {
+        Row: {
+          id: string
+          name: string
+          brand: string | null
+          category: string | null
+          /** Primary barcode (EAN/UPC) — the spine of catalog identity. */
+          gtin: string | null
+          base_unit: string
+          image_url: string | null
+          is_active: boolean
+          created_by_business: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['canonical_products']['Row']> & { name: string }
+        Update: Partial<Database['public']['Tables']['canonical_products']['Row']>
+        Relationships: []
+      }
+      supplier_profiles: {
+        Row: {
+          id: string
+          business_id: string
+          display_name: string
+          logo_url: string | null
+          description: string | null
+          location_text: string | null
+          delivery_areas: string[] | null
+          min_order_note: string | null
+          contact_phone: string | null
+          contact_whatsapp: string | null
+          contact_email: string | null
+          verification: SupplierVerification
+          /** Listed only when is_public AND verification = 'verified'. */
+          is_public: boolean
+          completed_orders: number
+          fulfillment_rate: string | null
+          avg_response_minutes: number | null
+          repeat_customers: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['supplier_profiles']['Row']> & {
+          business_id: string
+          display_name: string
+        }
+        Update: Partial<Database['public']['Tables']['supplier_profiles']['Row']>
+        Relationships: []
+      }
+      supplier_listings: {
+        Row: {
+          id: string
+          supplier_profile_id: string
+          business_id: string
+          canonical_product_id: string
+          supplier_product_name: string | null
+          purchase_unit: string
+          conversion_to_base: string
+          min_order_qty: string
+          availability: ListingStatus
+          currency_code: string
+          created_at: string
+          updated_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['supplier_listings']['Row']> & {
+          supplier_profile_id: string
+          business_id: string
+          canonical_product_id: string
+          currency_code: string
+        }
+        Update: Partial<Database['public']['Tables']['supplier_listings']['Row']>
+        Relationships: []
+      }
+      listing_price_tiers: {
+        Row: {
+          id: string
+          listing_id: string
+          business_id: string
+          min_qty: string
+          max_qty: string | null
+          unit_price: string
+          created_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['listing_price_tiers']['Row']> & {
+          listing_id: string
+          business_id: string
+          min_qty: string
+          unit_price: string
+        }
+        Update: Partial<Database['public']['Tables']['listing_price_tiers']['Row']>
+        Relationships: []
+      }
+      supplier_connections: {
+        Row: {
+          id: string
+          requester_business_id: string
+          supplier_profile_id: string
+          status: ConnectStatus
+          /** The private Phase 5 supplier minted when the request is accepted. */
+          private_supplier_id: string | null
+          requested_at: string
+          responded_at: string | null
+        }
+        Insert: Partial<Database['public']['Tables']['supplier_connections']['Row']> & {
+          requester_business_id: string
+          supplier_profile_id: string
+        }
+        Update: Partial<Database['public']['Tables']['supplier_connections']['Row']>
+        Relationships: []
+      }
       product_barcodes: {
         Row: {
           id: string
@@ -79,6 +189,8 @@ export interface Database {
           /** Base units one scan of this code represents. >1 for cartons. */
           units_per_scan: string
           is_primary: boolean
+          /** Resolver → canonical identity (0024). */
+          canonical_product_id: string | null
           created_at: string
         }
         Insert: Partial<Database['public']['Tables']['product_barcodes']['Row']> & {
@@ -283,6 +395,8 @@ export interface Database {
           low_stock_threshold: string
           is_active: boolean
           is_default: boolean
+          /** Links "what I stock" to "what suppliers sell" (0024). */
+          canonical_product_id: string | null
           created_at: string
           updated_at: string
         }
@@ -849,6 +963,29 @@ export interface Database {
       }
     }
     Views: {
+      v_marketplace_listings: {
+        Row: {
+          listing_id: string
+          canonical_product_id: string
+          product_name: string
+          brand: string | null
+          category: string | null
+          image_url: string | null
+          supplier_profile_id: string
+          supplier_name: string
+          location_text: string | null
+          verification: SupplierVerification
+          fulfillment_rate: string | null
+          completed_orders: number
+          purchase_unit: string
+          min_order_qty: string
+          availability: ListingStatus
+          currency_code: string
+          /** Cheapest tier. Null when the listing has no price tiers yet. */
+          from_price: string | null
+        }
+        Relationships: []
+      }
       v_variant_stock: {
         Row: {
           variant_id: string
@@ -1046,6 +1183,31 @@ export interface Database {
       }
     }
     Functions: {
+      publish_supplier_profile: {
+        Args: {
+          p_business_id: string
+          p_display_name: string
+          p_description?: string | null
+          p_location_text?: string | null
+        }
+        Returns: Database['public']['Tables']['supplier_profiles']['Row']
+      }
+      request_supplier_connection: {
+        Args: { p_business_id: string; p_supplier_profile_id: string }
+        Returns: Database['public']['Tables']['supplier_connections']['Row']
+      }
+      accept_supplier_connection: {
+        Args: { p_connection_id: string }
+        Returns: Database['public']['Tables']['supplier_connections']['Row']
+      }
+      decline_supplier_connection: {
+        Args: { p_connection_id: string }
+        Returns: Database['public']['Tables']['supplier_connections']['Row']
+      }
+      revoke_supplier_connection: {
+        Args: { p_connection_id: string }
+        Returns: Database['public']['Tables']['supplier_connections']['Row']
+      }
       resolve_barcode: {
         Args: { p_business_id: string; p_code: string }
         Returns: ResolvedBarcode
@@ -1502,3 +1664,14 @@ export interface CountApprovalResult {
   adjustments?: number
   shrinkage_value?: string
 }
+
+// ---------------------------------------------------------------------------
+// Phase 11 — business network (0024 / 0025)
+//
+// These are the PUBLIC plane. Anything typed here is readable across
+// businesses by design. Private cost, margin, purchase history and inventory
+// live in the private tables above and never gain a public read path.
+// ---------------------------------------------------------------------------
+export type SupplierVerification = 'unverified' | 'pending' | 'verified' | 'rejected'
+export type ListingStatus = 'active' | 'out_of_stock' | 'hidden'
+export type ConnectStatus = 'requested' | 'accepted' | 'declined' | 'revoked'

@@ -16,7 +16,10 @@ export function useFinancialPosition() {
       const { data, error } = await supabase.rpc('financial_position', {
         p_business_id: business!.id,
       })
-      if (error) throw error
+      if (error) {
+        console.error('[financial_position] failed', error)
+        throw error
+      }
       return data as unknown as FinancialPosition
     },
     enabled: !!business && canSee,

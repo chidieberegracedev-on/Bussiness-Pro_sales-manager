@@ -95,7 +95,7 @@ export function useHoldBasket() {
       // Attribution comes from the session token, not a client-supplied id.
       const token = readToken()
       if (token) {
-        await supabase.rpc('record_activity_as_actor', {
+        const { error: activityError } = await supabase.rpc('record_activity_as_actor', {
           p_business_id: business!.id,
           p_action_type: 'basket_held',
           p_actor_token: token,
@@ -105,6 +105,7 @@ export function useHoldBasket() {
           p_reference_id: (data as HeldBasket).id,
           p_detail: { item_count: input.lines.length, total: total.toFixed(4) },
         })
+        if (activityError) console.error('[record_activity_as_actor] failed', activityError)
       }
       return data as HeldBasket
     },
@@ -129,7 +130,7 @@ export function useResumeBasket() {
       const ctx = readSessionContext()
       const token = readToken()
       if (token) {
-        await supabase.rpc('record_activity_as_actor', {
+        const { error: activityError } = await supabase.rpc('record_activity_as_actor', {
           p_business_id: business!.id,
           p_action_type: 'basket_resumed',
           p_actor_token: token,
@@ -137,6 +138,7 @@ export function useResumeBasket() {
           p_reference_type: 'held_basket',
           p_reference_id: basketId,
         })
+        if (activityError) console.error('[record_activity_as_actor] failed', activityError)
       }
       return data as HeldBasket
     },
@@ -162,7 +164,7 @@ export function useTransferBasket() {
 
       const token = readToken()
       if (token) {
-        await supabase.rpc('record_activity_as_actor', {
+        const { error: activityError } = await supabase.rpc('record_activity_as_actor', {
           p_business_id: business!.id,
           p_action_type: 'basket_transferred',
           p_actor_token: token,
@@ -171,6 +173,7 @@ export function useTransferBasket() {
           p_reference_id: basketId,
           p_severity: 'notice',
         })
+        if (activityError) console.error('[record_activity_as_actor] failed', activityError)
       }
       return data as HeldBasket
     },
@@ -193,7 +196,7 @@ export function useDiscardBasket() {
       const ctx = readSessionContext()
       const token = readToken()
       if (token) {
-        await supabase.rpc('record_activity_as_actor', {
+        const { error: activityError } = await supabase.rpc('record_activity_as_actor', {
           p_business_id: business!.id,
           p_action_type: 'basket_discarded',
           p_actor_token: token,
@@ -202,6 +205,7 @@ export function useDiscardBasket() {
           p_reference_id: basketId,
           p_severity: 'notice',
         })
+        if (activityError) console.error('[record_activity_as_actor] failed', activityError)
       }
     },
     onSuccess: () => qc.invalidateQueries({ queryKey: ['held-baskets', business?.id] }),

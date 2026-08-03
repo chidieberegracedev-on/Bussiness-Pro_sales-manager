@@ -24,7 +24,10 @@ export function useSalesReport(from: string, to: string) {
         p_from: from,
         p_to: to,
       })
-      if (error) throw error
+      if (error) {
+        console.error('[sales_report] failed', error)
+        throw error
+      }
       return data as unknown as SalesReportData
     },
     enabled: !!business && !!from && !!to,

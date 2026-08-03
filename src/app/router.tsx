@@ -47,6 +47,10 @@ import { SettingsTerminalsPage } from '@/features/control/settings-terminals'
 import { CountSessionsPage } from '@/features/counting/count-sessions-page'
 import { CountSessionPage } from '@/features/counting/count-session-page'
 import { PrintQueuePage } from '@/features/print/print-queue-page'
+import { MarketplacePage } from '@/features/network/marketplace-page'
+import { SupplierProfilePage } from '@/features/network/supplier-profile-page'
+import { MyStorefrontPage } from '@/features/network/my-storefront-page'
+import { ConnectionsPage } from '@/features/network/connections-page'
 import { EmployeeDirectoryPage } from '@/features/control/employee-directory'
 import { SettingsPermissionsPage } from '@/features/control/settings-permissions'
 import { LiveShiftsPage } from '@/features/control/live-shifts-page'
@@ -128,6 +132,15 @@ export function AppRouter() {
             </Route>
 
             <Route path="/purchase-history" element={<PurchaseHistoryPage />} />
+
+            {/* The public plane. Discovery is open to anyone who can see
+                purchasing; publishing and connecting are owner/manager. */}
+            <Route path="/network" element={<MarketplacePage />} />
+            <Route path="/network/suppliers/:id" element={<SupplierProfilePage />} />
+            <Route element={<RequireRole roles={[...MANAGE_ROLES]} />}>
+              <Route path="/network/my-profile" element={<MyStorefrontPage />} />
+              <Route path="/network/connections" element={<ConnectionsPage />} />
+            </Route>
 
             <Route path="/expenses" element={<ExpensesPage />} />
             <Route path="/shifts" element={<ShiftsListPage />} />

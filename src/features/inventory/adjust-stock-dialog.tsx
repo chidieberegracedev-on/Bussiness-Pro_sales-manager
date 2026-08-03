@@ -121,6 +121,7 @@ function AdjustStockForm({ context, onDone }: { context: StockDialogContext; onD
       p_note: `${reasonConfig?.label ?? 'Adjustment'}${values.note ? `: ${values.note}` : ''}`,
     })
 
+    if (error) console.error('[record_stock_movement] failed', error)
     if (error) {
       setServerError(toReadableError(error))
       return

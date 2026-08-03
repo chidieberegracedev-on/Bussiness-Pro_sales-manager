@@ -23,7 +23,10 @@ export function useProductPerformance(from: string, to: string) {
         p_from: from,
         p_to: to,
       })
-      if (error) throw error
+      if (error) {
+        console.error('[product_performance] failed', error)
+        throw error
+      }
       return (data ?? []) as unknown as ProductPerformanceRow[]
     },
     enabled: !!business && !!from && !!to,

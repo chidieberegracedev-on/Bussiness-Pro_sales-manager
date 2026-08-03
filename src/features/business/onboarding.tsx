@@ -46,6 +46,7 @@ export function OnboardingPage() {
     })
 
     if (error || !data) {
+      console.error('[create_business] failed', error)
       setServerError(toReadableError(error))
       return
     }

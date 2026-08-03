@@ -259,7 +259,10 @@ export function useCancelCountSession() {
   return useMutation({
     mutationFn: async (sessionId: string) => {
       const { error } = await supabase.rpc('cancel_count_session', { p_session_id: sessionId })
-      if (error) throw error
+      if (error) {
+        console.error('[cancel_count_session] failed', error)
+        throw error
+      }
     },
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ['count-sessions', business?.id] })

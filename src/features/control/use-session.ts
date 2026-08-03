@@ -86,7 +86,9 @@ export function useRestoreSession() {
       const { data, error } = await supabase.rpc('session_context', { p_token: token })
       if (cancelled) return
       if (error || !data) {
-        // Token is stale or the session was ended elsewhere.
+        // Token is stale or the session was ended elsewhere — expected on a
+        // normal sign-out, so this is information rather than a failure.
+        if (error) console.error('[session_context] failed', error)
         clear()
         return
       }
@@ -127,7 +129,10 @@ export function usePinUnlock() {
       const { data: ctx, error: ctxError } = await supabase.rpc('session_context', {
         p_token: unlocked.token,
       })
-      if (ctxError || !ctx) throw ctxError ?? new Error('Could not load the session.')
+      if (ctxError || !ctx) {
+        console.error('[session_context] failed after unlock', ctxError)
+        throw ctxError ?? new Error('Could not load the session.')
+      }
       return { token: unlocked.token, context: ctx as unknown as SessionContext }
     },
     onSuccess: ({ token, context }) => {
@@ -167,7 +172,10 @@ export function useLockSession() {
       const token = readToken()
       if (!token) return
       const { error } = await supabase.rpc('pin_lock_session', { p_token: token })
-      if (error) throw error
+      if (error) {
+        console.error('[pin_lock_session] failed', error)
+        throw error
+      }
     },
     onSuccess: () => setLocked(),
   })
@@ -181,7 +189,10 @@ export function useEndSession() {
       const token = readToken()
       if (!token) return
       const { error } = await supabase.rpc('end_session', { p_token: token })
-      if (error) throw error
+      if (error) {
+        console.error('[end_session] failed', error)
+        throw error
+      }
     },
     onSettled: () => clear(),
   })

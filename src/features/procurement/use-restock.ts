@@ -14,7 +14,10 @@ export function useRestockSuggestions() {
       const { data, error } = await supabase.rpc('restock_suggestions', {
         p_business_id: business!.id,
       })
-      if (error) throw error
+      if (error) {
+        console.error('[restock_suggestions] failed', error)
+        throw error
+      }
       return (data ?? []) as RestockSuggestion[]
     },
     enabled: !!business,
