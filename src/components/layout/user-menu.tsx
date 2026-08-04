@@ -1,10 +1,8 @@
 import { useNavigate } from 'react-router-dom'
-import { useQueryClient } from '@tanstack/react-query'
 import { LogOut, Settings, User, UserRound, Repeat } from 'lucide-react'
-import { supabase } from '@/lib/supabase'
 import { useAuthStore } from '@/features/auth/store'
 import { useProfile } from '@/features/auth/use-profile'
-import { useBusinessStore } from '@/features/business/store'
+import { useSignOut } from '@/features/auth/use-sign-out'
 import { useCartStore } from '@/features/pos/cart-store'
 import { useEmployeeSessionStore } from '@/features/control/session-store'
 import { useEndSession } from '@/features/control/use-session'
@@ -19,7 +17,6 @@ import {
 } from '@/components/ui/dropdown-menu'
 import { Avatar, AvatarFallback } from '@/components/ui/avatar'
 import { Button } from '@/components/ui/button'
-import { toast } from '@/hooks/use-toast'
 
 function initials(name: string | null | undefined, email: string | undefined) {
   const source = name?.trim() || email || '?'
@@ -33,7 +30,7 @@ function initials(name: string | null | undefined, email: string | undefined) {
 export function UserMenu() {
   const user = useAuthStore((s) => s.user)
   const { data: profile } = useProfile()
-  const queryClient = useQueryClient()
+  const handleSignOut = useSignOut()
   const navigate = useNavigate()
   const sessionContext = useEmployeeSessionStore((s) => s.context)
   const endSession = useEndSession()
@@ -50,23 +47,6 @@ export function UserMenu() {
     // into admin instead of the operator screen they just asked for.
     useWorkspaceModeStore.getState().setOwnerAdmin(false)
     endSession.mutate()
-  }
-
-  async function handleSignOut() {
-    // AC-1.8: sign-out clears session and all cached business data.
-    const { error } = await supabase.auth.signOut()
-    if (error) {
-      toast({ variant: 'destructive', title: "Couldn't sign out", description: error.message })
-      return
-    }
-    useBusinessStore.getState().clearActiveBusiness()
-    useCartStore.getState().reset()
-    // The operator session lives on top of the business session — dropping the
-    // business must drop the operator with it.
-    useEmployeeSessionStore.getState().clear()
-    useWorkspaceModeStore.getState().setOwnerAdmin(false)
-    queryClient.clear()
-    navigate('/sign-in', { replace: true })
   }
 
   return (

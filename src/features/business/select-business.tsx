@@ -1,17 +1,20 @@
 import { useNavigate } from 'react-router-dom'
 import { useQueryClient } from '@tanstack/react-query'
-import { Building2, Store } from 'lucide-react'
+import { Building2, LogOut, Plus, Store } from 'lucide-react'
+import { useSignOut } from '@/features/auth/use-sign-out'
 import { useMyMemberships } from '@/features/business/hooks'
 import { useBusinessStore } from '@/features/business/store'
 import { useCartStore } from '@/features/pos/cart-store'
 import { TableSkeleton } from '@/components/data/loading-state'
 import { ErrorState } from '@/components/data/error-state'
+import { Button } from '@/components/ui/button'
 import { Card } from '@/components/ui/card'
 
 export function SelectBusinessPage() {
   const { data: memberships, isLoading, isError, refetch } = useMyMemberships()
   const setActiveBusiness = useBusinessStore((s) => s.setActiveBusiness)
   const queryClient = useQueryClient()
+  const signOut = useSignOut()
   const navigate = useNavigate()
 
   function handleSelect(businessId: string) {
@@ -56,6 +59,22 @@ export function SelectBusinessPage() {
             ))}
           </div>
         )}
+
+        {/* This screen also renders outside the app shell, so it needs its own
+            exits — one forward, one back to sign in. */}
+        <div className="mt-6 flex flex-col items-center gap-1">
+          <Button variant="ghost" size="sm" onClick={() => navigate('/onboarding')}>
+            <Plus className="size-4" /> Add another business
+          </Button>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="text-text-secondary"
+            onClick={() => void signOut()}
+          >
+            <LogOut className="size-4" /> Sign out
+          </Button>
+        </div>
       </div>
     </div>
   )

@@ -3,10 +3,12 @@ import { useNavigate } from 'react-router-dom'
 import { useForm } from 'react-hook-form'
 import { zodResolver } from '@hookform/resolvers/zod'
 import { useQueryClient } from '@tanstack/react-query'
-import { Loader2, Store } from 'lucide-react'
+import { ArrowLeft, Loader2, LogOut, Store } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { toReadableError } from '@/lib/errors'
 import { COUNTRIES, getCountry } from '@/lib/countries'
+import { useSignOut } from '@/features/auth/use-sign-out'
+import { useMyMemberships } from '@/features/business/hooks'
 import { useBusinessStore } from '@/features/business/store'
 import { useCartStore } from '@/features/pos/cart-store'
 import { createBusinessSchema, type CreateBusinessValues } from '@/features/business/schemas'
@@ -20,7 +22,15 @@ export function OnboardingPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const setActiveBusiness = useBusinessStore((s) => s.setActiveBusiness)
+  const signOut = useSignOut()
   const [serverError, setServerError] = useState<string | null>(null)
+
+  // Someone can land here with businesses they already belong to — from the
+  // switcher's "Add a business", or because the memberships query hadn't
+  // loaded when the guard ran. If they have somewhere to go back to, going
+  // back should not mean signing out.
+  const { data: memberships } = useMyMemberships()
+  const hasOtherBusinesses = (memberships ?? []).length > 0
 
   const form = useForm<CreateBusinessValues>({
     resolver: zodResolver(createBusinessSchema),
@@ -160,6 +170,27 @@ export function OnboardingPage() {
               </Button>
             </form>
           </Form>
+        </div>
+
+        {/* The way out. This screen is reachable straight after sign-in and
+            renders outside the app shell, so without this there is no back
+            button, no nav, and no user menu — the only escape is the browser.
+            A setup step you cannot abandon is a trap. */}
+        <div className="mt-5 text-center">
+          {hasOtherBusinesses ? (
+            <Button variant="ghost" size="sm" onClick={() => navigate('/select-business')}>
+              <ArrowLeft className="size-4" /> Back to my businesses
+            </Button>
+          ) : (
+            <>
+              <p className="text-sm text-text-secondary">
+                Not ready to set this up, or signed in to the wrong account?
+              </p>
+              <Button variant="ghost" size="sm" className="mt-1" onClick={() => void signOut()}>
+                <LogOut className="size-4" /> Sign out and go back to sign in
+              </Button>
+            </>
+          )}
         </div>
       </div>
     </div>
