@@ -49,7 +49,8 @@ import { toReadableError } from '@/lib/errors'
 export function SupplierProfilePage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { business } = useActiveBusiness()
+  const { business, role } = useActiveBusiness()
+  const canMessage = role === 'owner' || role === 'manager'
   const { data: profile, isLoading, isError } = useSupplierProfile(id)
   const { data: listings, isLoading: listingsLoading } = useSupplierListings(id)
   const statusMap = useConnectionStatusMap()
@@ -157,7 +158,9 @@ export function SupplierProfilePage() {
                 <Link2 className="size-4" /> Connect
               </Button>
             )}
-            {!isMine && id && (
+            {/* Messaging lives behind the owner/manager guard, so offering it
+                to a cashier would send them to a route that bounces them. */}
+            {!isMine && id && canMessage && (
               existingThread ? (
                 <Button variant="outline" className="bg-surface" asChild>
                   <Link to={`/network/messages/${existingThread.id}`}>

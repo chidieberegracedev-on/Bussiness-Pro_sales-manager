@@ -51,7 +51,9 @@ import { cn } from '@/lib/utils'
 export function ListingDetailPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
-  const { business } = useActiveBusiness()
+  const { business, role } = useActiveBusiness()
+  // Messaging is behind the owner/manager route guard — see supplier-profile.
+  const canMessage = role === 'owner' || role === 'manager'
   const { data: listing, isLoading, isError } = useListingDetail(id)
   const { data: images } = useListingImages(id)
   const { data: tiers } = useListingTiers(id)
@@ -307,7 +309,7 @@ export function ListingDetailPage() {
                 <Link2 className="size-4" /> Connect to order
               </Button>
             )}
-            {!isMine && (
+            {!isMine && canMessage && (
               <Button variant="outline" onClick={() => setMessageOpen(true)}>
                 <MessageSquare className="size-4" /> Ask a question
               </Button>
