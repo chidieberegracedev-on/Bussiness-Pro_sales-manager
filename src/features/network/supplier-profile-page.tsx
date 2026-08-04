@@ -1,3 +1,4 @@
+import { useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import Decimal from 'decimal.js'
 import {
@@ -22,8 +23,11 @@ import {
   useSupplierListings,
   useRequestConnection,
   useConnectionStatusMap,
+  useThreadWithSupplier,
+  useListingImageMap,
   type ListingWithTiers,
 } from '@/features/network/use-network'
+import { MessageSupplierDialog } from '@/features/network/message-supplier-dialog'
 import {
   VerificationBadge,
   TrustTierBadge,
@@ -50,6 +54,9 @@ export function SupplierProfilePage() {
   const { data: listings, isLoading: listingsLoading } = useSupplierListings(id)
   const statusMap = useConnectionStatusMap()
   const request = useRequestConnection()
+  const existingThread = useThreadWithSupplier(id)
+  const { data: imageMap } = useListingImageMap((listings ?? []).map((l) => l.id))
+  const [messageOpen, setMessageOpen] = useState(false)
 
   const isMine = !!profile && profile.business_id === business?.id
   const existing = id ? statusMap.get(id) : undefined
@@ -151,11 +158,21 @@ export function SupplierProfilePage() {
               </Button>
             )}
             {!isMine && id && (
-              <Button variant="outline" className="bg-surface" asChild>
-                <Link to={`/network/messages/${id}`}>
+              existingThread ? (
+                <Button variant="outline" className="bg-surface" asChild>
+                  <Link to={`/network/messages/${existingThread.id}`}>
+                    <MessageSquare className="size-4" /> Open conversation
+                  </Link>
+                </Button>
+              ) : (
+                <Button
+                  variant="outline"
+                  className="bg-surface"
+                  onClick={() => setMessageOpen(true)}
+                >
                   <MessageSquare className="size-4" /> Message
-                </Link>
-              </Button>
+                </Button>
+              )
             )}
           </div>
         </div>
@@ -196,9 +213,23 @@ export function SupplierProfilePage() {
       {!listingsLoading && (listings ?? []).length > 0 && (
         <div className="grid auto-rows-fr grid-cols-1 gap-3 md:grid-cols-2">
           {(listings ?? []).map((listing) => (
-            <ListingCard key={listing.id} listing={listing} />
+            <ListingCard
+              key={listing.id}
+              listing={listing}
+              // The supplier's own photo beats the shared catalog picture:
+              // it's what will actually arrive.
+              imageUrl={imageMap?.get(listing.id) ?? listing.product?.image_url ?? undefined}
+            />
           ))}
         </div>
+      )}
+
+      {messageOpen && profile && id && (
+        <MessageSupplierDialog
+          supplierProfileId={id}
+          supplierName={profile.display_name}
+          onClose={() => setMessageOpen(false)}
+        />
       )}
     </div>
   )
@@ -210,7 +241,13 @@ export function SupplierProfilePage() {
  * The tiers are the point: "cheaper if you buy more" is how wholesale actually
  * works, and a single price hides the decision a buyer is trying to make.
  */
-function ListingCard({ listing }: { listing: ListingWithTiers }) {
+function ListingCard({
+  listing,
+  imageUrl,
+}: {
+  listing: ListingWithTiers
+  imageUrl?: string
+}) {
   return (
     <Link
       to={`/network/listings/${listing.id}`}
@@ -220,8 +257,8 @@ function ListingCard({ listing }: { listing: ListingWithTiers }) {
         {/* The image well is the focal shape — larger radius than the card's
             inner controls, on a tint rather than another gray square. */}
         <span className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-tint-accent/60">
-          {listing.product?.image_url ? (
-            <img src={listing.product.image_url} alt="" className="size-full object-cover" />
+          {imageUrl ? (
+            <img src={imageUrl} alt="" className="size-full object-cover" loading="lazy" />
           ) : (
             <Package className="size-6 text-tint-accent-foreground/60" />
           )}

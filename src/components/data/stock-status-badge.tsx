@@ -15,8 +15,19 @@ const STATUS_CONFIG: Record<StockStatus, { label: string; icon: typeof AlertTria
   ok: { label: 'In stock', icon: CheckCircle2, variant: 'muted' },
 }
 
+// A status added to the database enum after this build shipped arrives here as
+// a key the map has never heard of. `config.icon` on an undefined config is a
+// render-time throw, which white-screens the whole product grid rather than
+// showing one odd badge — and it is the same lookup-by-raw-server-enum shape
+// that has broken this app before.
+const UNKNOWN_STATUS = {
+  label: 'Stock unknown',
+  icon: AlertTriangle,
+  variant: 'muted',
+} as const
+
 export function StockStatusBadge({ status }: { status: StockStatus }) {
-  const config = STATUS_CONFIG[status]
+  const config = STATUS_CONFIG[status] ?? UNKNOWN_STATUS
   const Icon = config.icon
   return (
     <Badge variant={config.variant}>

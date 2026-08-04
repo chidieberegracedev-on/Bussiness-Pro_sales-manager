@@ -1,10 +1,12 @@
-import { useState, type FormEvent } from 'react'
+import { useState, type ChangeEvent, type FormEvent } from 'react'
 import { Link } from 'react-router-dom'
 import Decimal from 'decimal.js'
 import {
   Package,
+  Pencil,
   Plus,
   Trash2,
+  ImagePlus,
   Loader2,
   Store,
   Search,
@@ -15,6 +17,7 @@ import {
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Textarea } from '@/components/ui/textarea'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { MoneyInput } from '@/components/money/money-input'
@@ -32,14 +35,19 @@ import {
   useDeletePriceTier,
   useCanonicalSearch,
   useCreateCanonicalProduct,
+  useListingImages,
+  useAddListingImage,
+  useDeleteListingImage,
   LISTING_STATUS_LABELS,
   type ListingWithTiers,
+  type ListingPhoto,
   type CanonicalProduct,
 } from '@/features/network/use-network'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { useActiveBusiness } from '@/features/business/hooks'
 import { toast } from '@/hooks/use-toast'
 import { toReadableError } from '@/lib/errors'
+import { toUploadErrorMessage } from '@/lib/image-upload'
 import type { ListingStatus } from '@/types/database'
 
 const STATUSES: ListingStatus[] = ['active', 'out_of_stock', 'hidden']
@@ -155,10 +163,12 @@ function ListingRow({
   const remove = useDeleteListing()
   const addTier = useAddPriceTier()
   const removeTier = useDeletePriceTier()
+  const { data: photos } = useListingImages(listing.id)
 
   const [minQty, setMinQty] = useState('')
   const [maxQty, setMaxQty] = useState('')
   const [price, setPrice] = useState('')
+  const [detailsOpen, setDetailsOpen] = useState(false)
 
   async function submitTier(e: FormEvent) {
     e.preventDefault()
@@ -182,22 +192,27 @@ function ListingRow({
     }
   }
 
+  const cover = (photos ?? [])[0]?.url ?? listing.product?.image_url ?? undefined
+
   return (
-    <Card>
+    <Card elevation="raised" className="rounded-2xl">
       <CardContent className="pt-6">
         <div className="flex min-w-0 flex-wrap items-start gap-3">
-          <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-muted">
-            {listing.product?.image_url ? (
-              <img src={listing.product.image_url} alt="" className="size-full object-cover" />
+          <span className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-tint-accent/60">
+            {cover ? (
+              <img src={cover} alt="" className="size-full object-cover" />
             ) : (
-              <Package className="size-5 text-text-muted" />
+              <Package className="size-5 text-tint-accent-foreground/60" />
             )}
           </span>
 
           <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold text-text-primary">
+            <Link
+              to={`/network/listings/${listing.id}`}
+              className="block truncate text-sm font-semibold text-text-primary hover:underline"
+            >
               {listing.supplier_product_name ?? listing.product?.name ?? 'Product'}
-            </p>
+            </Link>
             <p className="truncate text-xs text-text-muted">
               {/* Only worth showing when the supplier gave it a different name
                   — otherwise it just repeats the heading. */}
@@ -217,6 +232,9 @@ function ListingRow({
 
           {canManage && (
             <div className="flex shrink-0 items-center gap-2">
+              <Button variant="ghost" size="sm" onClick={() => setDetailsOpen(true)}>
+                <Pencil className="size-3.5" /> Details
+              </Button>
               <Select
                 value={listing.availability}
                 onValueChange={(v) =>
@@ -247,6 +265,11 @@ function ListingRow({
             </div>
           )}
         </div>
+
+        {/* Photos. Not the catalog picture — the supplier's own, of the goods
+            they will actually send. A buyer deciding between four suppliers of
+            the same catalog entry has nothing else to look at. */}
+        {canManage && <PhotoStrip listing={listing} photos={photos ?? []} />}
 
         {/* Price breaks. The whole point of wholesale — one flat price hides
             the decision the buyer is actually making. */}
@@ -332,7 +355,195 @@ function ListingRow({
           )}
         </div>
       </CardContent>
+
+      {detailsOpen && (
+        <ListingDetailsDialog listing={listing} onClose={() => setDetailsOpen(false)} />
+      )}
     </Card>
+  )
+}
+
+/**
+ * The photo row.
+ *
+ * Uploads go to the PUBLIC network-images bucket — a marketplace photo is read
+ * by businesses that are not members of this one, so it cannot be a signed URL
+ * from a private bucket. That also means these images are readable by anyone
+ * holding the link, which is why the caption says so rather than leaving a
+ * supplier to discover it.
+ */
+function PhotoStrip({
+  listing,
+  photos,
+}: {
+  listing: ListingWithTiers
+  photos: ListingPhoto[]
+}) {
+  const add = useAddListingImage()
+  const remove = useDeleteListingImage()
+
+  function onPick(event: ChangeEvent<HTMLInputElement>) {
+    const file = event.target.files?.[0]
+    // Reset immediately, or picking the same file twice in a row is a no-op.
+    event.target.value = ''
+    if (!file) return
+    add.mutate(
+      { listingId: listing.id, file, sortOrder: photos.length },
+      {
+        onError: (error) =>
+          toast({
+            variant: 'destructive',
+            title: "Couldn't upload that photo",
+            description: toUploadErrorMessage(error),
+          }),
+      },
+    )
+  }
+
+  return (
+    <div className="mt-4">
+      <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">Photos</p>
+      <div className="mt-2 flex flex-wrap gap-2">
+        {photos.map((photo) => (
+          <div key={photo.id} className="group relative">
+            <img
+              src={photo.url}
+              alt=""
+              className="size-20 rounded-xl object-cover shadow-e1"
+              loading="lazy"
+            />
+            <button
+              type="button"
+              onClick={() => remove.mutate(photo)}
+              aria-label="Remove this photo"
+              className="absolute -right-1.5 -top-1.5 flex size-6 items-center justify-center rounded-full bg-surface text-text-muted shadow-e2 transition-colors hover:bg-danger hover:text-white"
+            >
+              <X className="size-3.5" />
+            </button>
+          </div>
+        ))}
+
+        <label
+          className={`flex size-20 cursor-pointer flex-col items-center justify-center gap-1 rounded-xl bg-tint-accent text-xs font-medium text-tint-accent-foreground transition-opacity ${
+            add.isPending ? 'opacity-60' : 'hover:opacity-85'
+          }`}
+        >
+          {add.isPending ? (
+            <Loader2 className="size-5 animate-spin" />
+          ) : (
+            <ImagePlus className="size-5" />
+          )}
+          {add.isPending ? 'Uploading' : 'Add photo'}
+          <input
+            type="file"
+            accept="image/*"
+            className="sr-only"
+            onChange={onPick}
+            disabled={add.isPending}
+          />
+        </label>
+      </div>
+      <p className="mt-1.5 text-xs text-text-muted">
+        Published to the network — anyone with the link can see these, including after you hide the
+        listing. The first photo is the one buyers see on cards.
+      </p>
+    </div>
+  )
+}
+
+/** Description, packing and lead time — the questions a buyer asks anyway. */
+function ListingDetailsDialog({
+  listing,
+  onClose,
+}: {
+  listing: ListingWithTiers
+  onClose: () => void
+}) {
+  const update = useUpdateListing()
+  const [description, setDescription] = useState(listing.description ?? '')
+  const [pack, setPack] = useState(listing.pack_description ?? '')
+  const [leadTime, setLeadTime] = useState(
+    listing.lead_time_days == null ? '' : String(listing.lead_time_days),
+  )
+
+  function save() {
+    update.mutate(
+      {
+        id: listing.id,
+        description: description.trim() || null,
+        pack_description: pack.trim() || null,
+        lead_time_days: leadTime.trim() ? Number(leadTime) : null,
+      },
+      {
+        onSuccess: () => {
+          toast({ title: 'Listing updated' })
+          onClose()
+        },
+        onError: (error) =>
+          toast({
+            variant: 'destructive',
+            title: "Couldn't save that",
+            description: toReadableError(error),
+          }),
+      },
+    )
+  }
+
+  return (
+    <Dialog open onOpenChange={(open) => !open && onClose()}>
+      <DialogContent>
+        <DialogHeader>
+          <DialogTitle>
+            {listing.supplier_product_name ?? listing.product?.name ?? 'Listing'} details
+          </DialogTitle>
+        </DialogHeader>
+
+        <div className="space-y-4">
+          <div>
+            <label className="text-sm font-medium text-text-secondary">Description</label>
+            <Textarea
+              className="mt-1"
+              rows={4}
+              value={description}
+              onChange={(e) => setDescription(e.target.value)}
+              placeholder="What it is, what condition, anything a buyer should know before ordering."
+            />
+          </div>
+
+          <div className="grid gap-3 sm:grid-cols-2">
+            <div>
+              <label className="text-sm font-medium text-text-secondary">Packing</label>
+              <Input
+                className="mt-1"
+                value={pack}
+                onChange={(e) => setPack(e.target.value)}
+                placeholder={`e.g. sealed ${listing.purchase_unit}`}
+              />
+            </div>
+            <div>
+              <label className="text-sm font-medium text-text-secondary">Lead time (days)</label>
+              <Input
+                className="mt-1"
+                value={leadTime}
+                onChange={(e) => setLeadTime(e.target.value.replace(/[^\d]/g, ''))}
+                inputMode="numeric"
+                placeholder="2"
+              />
+            </div>
+          </div>
+        </div>
+
+        <div className="flex justify-end gap-2">
+          <Button variant="outline" onClick={onClose}>
+            Cancel
+          </Button>
+          <Button onClick={save} disabled={update.isPending}>
+            {update.isPending && <Loader2 className="size-4 animate-spin" />}
+            Save
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   )
 }
 

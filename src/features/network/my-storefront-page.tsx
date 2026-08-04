@@ -8,15 +8,20 @@ import {
   ShieldCheck,
   Info,
   Eye,
+  Link2,
   Lock,
   Package,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
+import { Switch } from '@/components/ui/switch'
+import { IconBadge, NotePanel } from '@/components/ui/icon-badge'
 import { PageHeader } from '@/components/layout/page-header'
 import {
   useMySupplierProfile,
+  useMyListings,
+  useIncomingConnections,
   usePublishSupplierProfile,
   useUpdateSupplierProfile,
 } from '@/features/network/use-network'
@@ -47,6 +52,8 @@ const TIER_ORDER: TrustTier[] = ['provisional', 'verified', 'trusted', 'preferre
 export function MyStorefrontPage() {
   const { business, role } = useActiveBusiness()
   const { data: profile, isLoading } = useMySupplierProfile()
+  const { data: listings } = useMyListings()
+  const { data: incoming } = useIncomingConnections()
   const publish = usePublishSupplierProfile()
   const update = useUpdateSupplierProfile()
 
@@ -121,6 +128,34 @@ export function MyStorefrontPage() {
   // on existing (0027).
   const live = !!profile?.is_public && profile.verification !== 'rejected'
   const provisional = live && profile?.verification !== 'verified'
+  /** Has a storefront but has switched itself off — distinct from never published. */
+  const hidden = !!profile && !profile.is_public
+
+  const visibleListings = (listings ?? []).filter((l) => l.availability === 'active').length
+  const hiddenListings = (listings ?? []).length - visibleListings
+  const connectedCount = (incoming ?? []).filter((c) => c.status === 'accepted').length
+
+  function setVisibility(next: boolean) {
+    if (!profile) return
+    update.mutate(
+      { id: profile.id, is_public: next },
+      {
+        onSuccess: () =>
+          toast({
+            title: next ? "You're listed again" : 'Hidden from the network',
+            description: next
+              ? 'Buyers can find your storefront and your active listings.'
+              : 'Your storefront and listings are kept — nobody new can find them.',
+          }),
+        onError: (error) =>
+          toast({
+            variant: 'destructive',
+            title: "Couldn't change that",
+            description: toReadableError(error),
+          }),
+      },
+    )
+  }
 
   return (
     <div className="space-y-6">
@@ -148,39 +183,101 @@ export function MyStorefrontPage() {
       {/* Status first — "am I actually listed?" is the only question this
           screen has to answer unambiguously. */}
       {!isLoading && (
-        <div
-          className={`flex items-start gap-2.5 rounded-lg border p-3 ${
-            provisional
-              ? 'border-accent-primary/30 bg-accent-primary/5'
-              : live
-                ? 'border-success/30 bg-success/5'
-                : 'border-border bg-surface-muted/50'
-          }`}
-        >
-          {provisional ? (
-            <Sparkles className="mt-0.5 size-4 shrink-0 text-accent-primary" />
-          ) : live ? (
-            <Globe className="mt-0.5 size-4 shrink-0 text-success" />
-          ) : (
-            <Lock className="mt-0.5 size-4 shrink-0 text-text-muted" />
-          )}
+        <NotePanel tone={live ? (provisional ? 'accent' : 'success') : 'neutral'} className="flex items-start gap-3">
+          <IconBadge
+            tone={live ? (provisional ? 'accent' : 'success') : 'neutral'}
+            size="lg"
+            className="bg-surface/70"
+          >
+            {provisional ? <Sparkles /> : live ? <Globe /> : <Lock />}
+          </IconBadge>
           <div className="min-w-0 text-sm">
-            <p className="font-medium text-text-primary">
+            <p className="font-semibold text-text-primary">
               {provisional
                 ? 'Live on the network — provisionally active'
                 : live
                   ? 'Live on the network'
-                  : 'Your business is private'}
+                  : hidden
+                    ? 'Hidden from the network'
+                    : 'Your business is private'}
             </p>
-            <p className="mt-0.5 text-text-secondary">
+            <p className="mt-0.5">
               {provisional
                 ? "You're listed and can start selling right now — buyers can find you, see your products, and send you requests. Verification comes later and raises your limits and your position in results; it isn't holding anything up."
                 : live
                   ? 'Verified. Other businesses can find your storefront and send you connection requests.'
-                  : 'Nobody outside your business can see anything about you. Publishing a storefront is the only thing that changes that, and it only lists the details you fill in below.'}
+                  : hidden
+                    ? "Your storefront still exists and your listings are kept, but nobody can find you in search or open your page. Turn visibility back on below whenever you're ready."
+                    : 'Nobody outside your business can see anything about you. Publishing a storefront is the only thing that changes that, and it only lists the details you fill in below.'}
             </p>
           </div>
-        </div>
+        </NotePanel>
+      )}
+
+      {/* Visibility. Publishing was a one-way door before this: there was no
+          control anywhere in the app that could take a storefront back off the
+          network, so the only way to stop being found was to delete every
+          listing one at a time. */}
+      {profile && (
+        <Card elevation="raised" className="rounded-2xl">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Eye className="size-5" /> Who can see you
+            </CardTitle>
+            <CardDescription>
+              Being listed is a switch you control, not something you can only do once.
+            </CardDescription>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl bg-background p-3.5">
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-text-primary">
+                  Listed on the network
+                </p>
+                <p className="mt-0.5 text-sm text-text-secondary">
+                  {profile.is_public
+                    ? 'Any business on the network can find your storefront and your active listings.'
+                    : "You're hidden. Existing conversations and connections carry on; new buyers can't find you."}
+                </p>
+              </div>
+              <Switch
+                checked={profile.is_public}
+                disabled={!canManage || update.isPending}
+                onCheckedChange={(next) => setVisibility(next)}
+                aria-label="Listed on the network"
+              />
+            </div>
+
+            <div className="grid gap-3 sm:grid-cols-3">
+              <VisibilityStat
+                icon={Package}
+                value={String(visibleListings)}
+                label={`Listing${visibleListings === 1 ? '' : 's'} buyers can see`}
+              />
+              <VisibilityStat
+                icon={Lock}
+                value={String(hiddenListings)}
+                label={`Hidden or out of stock`}
+              />
+              <VisibilityStat
+                icon={Link2}
+                value={String(connectedCount)}
+                label={`Connected buyer${connectedCount === 1 ? '' : 's'}`}
+              />
+            </div>
+
+            {profile.is_public && visibleListings === 0 && (
+              <NotePanel tone="warning" className="text-sm">
+                Your storefront is listed but has nothing for sale, so a buyer who finds you has
+                nothing to act on.{' '}
+                <Link to="/network/my-listings" className="font-semibold underline">
+                  List a product
+                </Link>
+                .
+              </NotePanel>
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {profile && (
@@ -404,6 +501,28 @@ export function MyStorefrontPage() {
           </p>
         </CardContent>
       </Card>
+    </div>
+  )
+}
+
+function VisibilityStat({
+  icon: Icon,
+  value,
+  label,
+}: {
+  icon: React.ComponentType<{ className?: string }>
+  value: string
+  label: string
+}) {
+  return (
+    <div className="flex min-w-0 items-center gap-3 rounded-xl bg-background p-3">
+      <IconBadge tone="accent" size="md">
+        <Icon />
+      </IconBadge>
+      <div className="min-w-0">
+        <p className="text-lg font-bold tabular-nums text-text-primary">{value}</p>
+        <p className="truncate text-xs text-text-muted">{label}</p>
+      </div>
     </div>
   )
 }

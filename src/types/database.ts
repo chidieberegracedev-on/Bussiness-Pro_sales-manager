@@ -132,6 +132,10 @@ export interface Database {
           min_order_qty: string
           availability: ListingStatus
           currency_code: string
+          /** Detail-page fields (0028). */
+          description: string | null
+          lead_time_days: number | null
+          pack_description: string | null
           created_at: string
           updated_at: string
         }
@@ -161,6 +165,72 @@ export interface Database {
           unit_price: string
         }
         Update: Partial<Database['public']['Tables']['listing_price_tiers']['Row']>
+        Relationships: []
+      }
+      /**
+       * A supplier's own photos of a listing (0028), distinct from the one
+       * shared `canonical_products.image_url`. Paths into the PUBLIC
+       * `network-images` bucket — build the URL with getPublicUrl, never a
+       * signed URL: the reader is by definition not a member of the owning
+       * business.
+       */
+      supplier_listing_images: {
+        Row: {
+          id: string
+          listing_id: string
+          business_id: string
+          storage_path: string
+          sort_order: number
+          created_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['supplier_listing_images']['Row']> & {
+          listing_id: string
+          business_id: string
+          storage_path: string
+        }
+        Update: Partial<Database['public']['Tables']['supplier_listing_images']['Row']>
+        Relationships: []
+      }
+      /**
+       * A conversation between a buyer business and a public supplier (0028).
+       * Both display names are SNAPSHOTS taken by `start_network_thread` — a
+       * supplier cannot read the buyer's `businesses` row, and must not be
+       * able to. Never join this to a private table.
+       */
+      network_threads: {
+        Row: {
+          id: string
+          buyer_business_id: string
+          buyer_display_name: string
+          supplier_profile_id: string
+          supplier_business_id: string
+          supplier_display_name: string
+          listing_id: string | null
+          listing_label: string | null
+          last_message_at: string | null
+          last_message_preview: string | null
+          last_sender_business_id: string | null
+          buyer_last_read_at: string | null
+          supplier_last_read_at: string | null
+          created_at: string
+        }
+        /** Read-only from the client — every write goes through an RPC. */
+        Insert: never
+        Update: never
+        Relationships: []
+      }
+      network_messages: {
+        Row: {
+          id: string
+          thread_id: string
+          sender_business_id: string
+          sender_user_id: string | null
+          sender_name: string | null
+          body: string
+          created_at: string
+        }
+        Insert: never
+        Update: never
         Relationships: []
       }
       supplier_connections: {
@@ -992,6 +1062,68 @@ export interface Database {
         }
         Relationships: []
       }
+      /**
+       * One listing in full (0028). Unlike v_marketplace_listings this has no
+       * visibility WHERE clause — RLS on supplier_listings does the gating, so
+       * the owning business can also open its own hidden listing to preview it.
+       */
+      v_listing_detail: {
+        Row: {
+          listing_id: string
+          supplier_business_id: string
+          supplier_profile_id: string
+          canonical_product_id: string
+          title: string
+          canonical_name: string
+          brand: string | null
+          category: string | null
+          base_unit: string
+          canonical_image_url: string | null
+          description: string | null
+          pack_description: string | null
+          lead_time_days: number | null
+          purchase_unit: string
+          conversion_to_base: string
+          min_order_qty: string
+          availability: ListingStatus
+          currency_code: string
+          created_at: string
+          updated_at: string
+          supplier_name: string
+          location_text: string | null
+          supplier_logo_url: string | null
+          verification: SupplierVerification
+          trust_tier: TrustTier
+          completed_orders: number
+          fulfillment_rate: string | null
+          repeat_customers: number
+          avg_response_minutes: number | null
+          min_order_note: string | null
+          contact_phone: string | null
+          contact_email: string | null
+          supplier_since: string
+          from_price: string | null
+        }
+        Relationships: []
+      }
+      /** Threads resolved from the caller's side (0028). */
+      v_network_threads: {
+        Row: {
+          id: string
+          buyer_business_id: string
+          supplier_business_id: string
+          supplier_profile_id: string
+          listing_id: string | null
+          listing_label: string | null
+          last_message_at: string | null
+          last_message_preview: string | null
+          created_at: string
+          i_am_buyer: boolean
+          counterparty_name: string
+          unread_count: number
+        }
+        Relationships: []
+      }
       v_variant_stock: {
         Row: {
           variant_id: string
@@ -1213,6 +1345,23 @@ export interface Database {
       revoke_supplier_connection: {
         Args: { p_connection_id: string }
         Returns: Database['public']['Tables']['supplier_connections']['Row']
+      }
+      start_network_thread: {
+        Args: {
+          p_business_id: string
+          p_supplier_profile_id: string
+          p_body: string
+          p_listing_id?: string | null
+        }
+        Returns: Database['public']['Tables']['network_threads']['Row']
+      }
+      send_network_message: {
+        Args: { p_thread_id: string; p_body: string }
+        Returns: Database['public']['Tables']['network_messages']['Row']
+      }
+      mark_network_thread_read: {
+        Args: { p_thread_id: string }
+        Returns: void
       }
       resolve_barcode: {
         Args: { p_business_id: string; p_code: string }

@@ -52,6 +52,8 @@ import { SupplierProfilePage } from '@/features/network/supplier-profile-page'
 import { MyStorefrontPage } from '@/features/network/my-storefront-page'
 import { ConnectionsPage } from '@/features/network/connections-page'
 import { MyListingsPage } from '@/features/network/my-listings-page'
+import { ListingDetailPage } from '@/features/network/listing-detail-page'
+import { MessagesPage, ThreadPage } from '@/features/network/messages-page'
 import { EmployeeDirectoryPage } from '@/features/control/employee-directory'
 import { SettingsPermissionsPage } from '@/features/control/settings-permissions'
 import { LiveShiftsPage } from '@/features/control/live-shifts-page'
@@ -138,10 +140,15 @@ export function AppRouter() {
                 purchasing; publishing and connecting are owner/manager. */}
             <Route path="/network" element={<MarketplacePage />} />
             <Route path="/network/suppliers/:id" element={<SupplierProfilePage />} />
+            <Route path="/network/listings/:id" element={<ListingDetailPage />} />
             <Route element={<RequireRole roles={[...MANAGE_ROLES]} />}>
               <Route path="/network/my-profile" element={<MyStorefrontPage />} />
               <Route path="/network/my-listings" element={<MyListingsPage />} />
               <Route path="/network/connections" element={<ConnectionsPage />} />
+              {/* Messaging is a commercial conversation on behalf of the
+                  business, so it sits with the other owner/manager screens. */}
+              <Route path="/network/messages" element={<MessagesPage />} />
+              <Route path="/network/messages/:id" element={<ThreadPage />} />
             </Route>
 
             <Route path="/expenses" element={<ExpensesPage />} />

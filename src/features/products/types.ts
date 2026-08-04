@@ -42,6 +42,22 @@ export interface GroupedProduct {
 
 const STATUS_SEVERITY: Record<StockStatus, number> = { negative: 0, out_of_stock: 1, low: 2, ok: 3 }
 
+/**
+ * A status this build doesn't recognise — a value added to the database enum
+ * after this frontend shipped — must never be swallowed as healthy.
+ *
+ * `STATUS_SEVERITY[unknown]` is undefined, and `undefined < 3` is false, so the
+ * comparison below silently left worstStatus at 'ok'. An inventory signal that
+ * defaults to "fine" when it doesn't understand itself is the one direction
+ * that can't be allowed: it hides the exception the screen exists to surface.
+ */
+function severityOf(status: StockStatus): number {
+  const known = STATUS_SEVERITY[status]
+  // Unknown sorts just below 'ok', so it wins over 'ok' and loses to every
+  // real warning. It surfaces without shouting louder than a genuine one.
+  return known ?? 2.5
+}
+
 export function groupByProduct(rows: VariantStockRow[]): GroupedProduct[] {
   const map = new Map<string, GroupedProduct>()
 
@@ -71,7 +87,7 @@ export function groupByProduct(rows: VariantStockRow[]): GroupedProduct[] {
     if (Number(row.selling_price) < Number(group.priceMin)) group.priceMin = row.selling_price
     if (Number(row.selling_price) > Number(group.priceMax)) group.priceMax = row.selling_price
     group.totalQty = String(Number(group.totalQty) + Number(row.qty_on_hand))
-    if (STATUS_SEVERITY[row.stock_status] < STATUS_SEVERITY[group.worstStatus]) {
+    if (severityOf(row.stock_status) < severityOf(group.worstStatus)) {
       group.worstStatus = row.stock_status
     }
   }

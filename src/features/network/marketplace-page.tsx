@@ -12,6 +12,7 @@ import {
   Globe,
   ShieldCheck,
   Inbox,
+  MessagesSquare,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -28,6 +29,7 @@ import {
   useConnectionStatusMap,
   useMySupplierProfile,
   useIncomingConnections,
+  useUnreadMessageCount,
   type MarketplaceProduct,
   type MarketplaceRow,
 } from '@/features/network/use-network'
@@ -65,6 +67,7 @@ export function MarketplacePage() {
   })
   const { data: myProfile } = useMySupplierProfile()
   const { data: incoming } = useIncomingConnections()
+  const unread = useUnreadMessageCount()
 
   const pendingIncoming = (incoming ?? []).filter((c) => c.status === 'requested').length
 
@@ -84,6 +87,14 @@ export function MarketplacePage() {
         description="Find suppliers, compare what they charge, and connect with the ones you want to buy from. Nothing here can see your costs, your margins, or your stock."
         actions={
           <div className="flex flex-wrap gap-2">
+            {unread > 0 && (
+              <Button variant="outline" asChild>
+                <Link to="/network/messages">
+                  <MessagesSquare className="size-4" /> {unread} new message
+                  {unread === 1 ? '' : 's'}
+                </Link>
+              </Button>
+            )}
             {pendingIncoming > 0 && (
               <Button variant="outline" asChild>
                 <Link to="/network/connections">

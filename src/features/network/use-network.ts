@@ -2,6 +2,8 @@ import { useMemo } from 'react'
 import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
 import Decimal from 'decimal.js'
 import { supabase } from '@/lib/supabase'
+import { networkImageUrl, uploadBusinessScopedImage } from '@/lib/image-upload'
+import { NETWORK_IMAGE_BUCKET } from '@/lib/storage-buckets'
 import { useActiveBusiness } from '@/features/business/hooks'
 import type {
   ConnectStatus,
@@ -713,4 +715,339 @@ export const LISTING_STATUS_LABELS: Record<ListingStatus, string> = {
   active: 'For sale',
   out_of_stock: 'Out of stock',
   hidden: 'Hidden',
+}
+
+// ---------------------------------------------------------------------------
+// Listing photos (0028)
+//
+// These live in the PUBLIC network-images bucket, so a URL is built with
+// networkImageUrl() rather than signed. A signed URL is scoped by membership,
+// and the whole point of a marketplace photo is that a non-member sees it —
+// signing here would fail silently as a broken image on every screen but the
+// owner's own.
+// ---------------------------------------------------------------------------
+
+export type ListingImage = Database['public']['Tables']['supplier_listing_images']['Row']
+
+export interface ListingPhoto extends ListingImage {
+  /** Ready to drop into an <img src>. Undefined only if the path is empty. */
+  url: string | undefined
+}
+
+export function useListingImages(listingId: string | undefined) {
+  return useQuery({
+    queryKey: ['listing-images', listingId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('supplier_listing_images')
+        .select('*')
+        .eq('listing_id', listingId!)
+        .order('sort_order', { ascending: true })
+        .order('created_at', { ascending: true })
+      if (error) {
+        console.error('[supplier_listing_images] failed', { listingId, error })
+        throw error
+      }
+      return ((data ?? []) as ListingImage[]).map(
+        (row): ListingPhoto => ({ ...row, url: networkImageUrl(row.storage_path) }),
+      )
+    },
+    enabled: !!listingId,
+  })
+}
+
+/** Photos for many listings at once, so a grid doesn't fire a query per card. */
+export function useListingImageMap(listingIds: string[]) {
+  const key = [...listingIds].sort().join(',')
+
+  return useQuery({
+    queryKey: ['listing-image-map', key],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('supplier_listing_images')
+        .select('*')
+        .in('listing_id', listingIds)
+        .order('sort_order', { ascending: true })
+      if (error) {
+        console.error('[listing image map] failed', error)
+        throw error
+      }
+      // First photo per listing — the one a card shows.
+      const map = new Map<string, string>()
+      for (const row of (data ?? []) as ListingImage[]) {
+        if (map.has(row.listing_id)) continue
+        const url = networkImageUrl(row.storage_path)
+        if (url) map.set(row.listing_id, url)
+      }
+      return map
+    },
+    enabled: listingIds.length > 0,
+  })
+}
+
+export function useAddListingImage() {
+  const { business } = useActiveBusiness()
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (input: { listingId: string; file: File; sortOrder?: number }) => {
+      const path = await uploadBusinessScopedImage(
+        NETWORK_IMAGE_BUCKET,
+        business!.id,
+        input.file,
+        { kind: 'network-listing', listingId: input.listingId },
+      )
+      const { data, error } = await supabase
+        .from('supplier_listing_images')
+        .insert({
+          listing_id: input.listingId,
+          business_id: business!.id,
+          storage_path: path,
+          sort_order: input.sortOrder ?? 0,
+        })
+        .select()
+        .single()
+      if (error) {
+        console.error('[supplier_listing_images.insert] failed', { input: input.listingId, error })
+        throw error
+      }
+      return data as ListingImage
+    },
+    onSuccess: (_d, input) => {
+      qc.invalidateQueries({ queryKey: ['listing-images', input.listingId] })
+      qc.invalidateQueries({ queryKey: ['listing-image-map'] })
+    },
+  })
+}
+
+export function useDeleteListingImage() {
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (image: ListingImage) => {
+      const { error } = await supabase
+        .from('supplier_listing_images')
+        .delete()
+        .eq('id', image.id)
+      if (error) {
+        console.error('[supplier_listing_images.delete] failed', { id: image.id, error })
+        throw error
+      }
+      // The row is the record; a leftover object in the bucket is wasted bytes
+      // rather than a visible bug, so a failure here is logged, not thrown.
+      const { error: storageError } = await supabase.storage
+        .from(NETWORK_IMAGE_BUCKET)
+        .remove([image.storage_path])
+      if (storageError) {
+        console.error('[network-images.remove] failed', { path: image.storage_path, storageError })
+      }
+    },
+    onSuccess: (_d, image) => {
+      qc.invalidateQueries({ queryKey: ['listing-images', image.listing_id] })
+      qc.invalidateQueries({ queryKey: ['listing-image-map'] })
+    },
+  })
+}
+
+// ---------------------------------------------------------------------------
+// Listing detail (0028)
+// ---------------------------------------------------------------------------
+
+export type ListingDetail = Database['public']['Views']['v_listing_detail']['Row']
+
+export function useListingDetail(listingId: string | undefined) {
+  return useQuery({
+    queryKey: ['listing-detail', listingId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('v_listing_detail')
+        .select('*')
+        .eq('listing_id', listingId!)
+        .maybeSingle()
+      if (error) {
+        console.error('[v_listing_detail] failed', { listingId, error })
+        throw error
+      }
+      return (data ?? null) as ListingDetail | null
+    },
+    enabled: !!listingId,
+  })
+}
+
+export function useListingTiers(listingId: string | undefined) {
+  return useQuery({
+    queryKey: ['listing-tiers', listingId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('listing_price_tiers')
+        .select('*')
+        .eq('listing_id', listingId!)
+      if (error) {
+        console.error('[listing_price_tiers] failed', { listingId, error })
+        throw error
+      }
+      return ((data ?? []) as PriceTier[]).sort((a, b) =>
+        new Decimal(a.min_qty).comparedTo(new Decimal(b.min_qty)),
+      )
+    },
+    enabled: !!listingId,
+  })
+}
+
+/**
+ * The price a quantity actually lands on.
+ *
+ * Wholesale tiers are the reason a buyer is looking, and "from 4.20" is not
+ * the number they will pay. Picking the tier here means the detail page can
+ * show the real unit price and the real line total as the stepper moves.
+ */
+export function tierForQuantity(tiers: PriceTier[], qty: Decimal): PriceTier | null {
+  let best: PriceTier | null = null
+  for (const tier of tiers) {
+    const min = new Decimal(tier.min_qty)
+    if (qty.lt(min)) continue
+    if (tier.max_qty !== null && qty.gt(new Decimal(tier.max_qty))) continue
+    // Tiers are sorted ascending, so the last match is the deepest break.
+    best = tier
+  }
+  return best
+}
+
+// ---------------------------------------------------------------------------
+// Messaging (0028)
+//
+// Every write is an RPC. The client never inserts a thread or a message
+// directly — the server is what resolves which side the caller is on, and
+// snapshots the display names onto the thread.
+// ---------------------------------------------------------------------------
+
+export type NetworkThread = Database['public']['Views']['v_network_threads']['Row']
+export type NetworkMessage = Database['public']['Tables']['network_messages']['Row']
+
+export function useNetworkThreads() {
+  const { business } = useActiveBusiness()
+
+  return useQuery({
+    queryKey: ['network-threads', business?.id],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('v_network_threads')
+        .select('*')
+        .order('last_message_at', { ascending: false, nullsFirst: false })
+      if (error) {
+        console.error('[v_network_threads] failed', error)
+        throw error
+      }
+      return (data ?? []) as NetworkThread[]
+    },
+    enabled: !!business,
+    // A conversation is live: someone is waiting on the other end.
+    refetchInterval: 30_000,
+  })
+}
+
+export function useUnreadMessageCount(): number {
+  const { data } = useNetworkThreads()
+  return (data ?? []).reduce((sum, t) => sum + (t.unread_count ?? 0), 0)
+}
+
+export function useThreadMessages(threadId: string | undefined) {
+  return useQuery({
+    queryKey: ['network-messages', threadId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('network_messages')
+        .select('*')
+        .eq('thread_id', threadId!)
+        .order('created_at', { ascending: true })
+      if (error) {
+        console.error('[network_messages] failed', { threadId, error })
+        throw error
+      }
+      return (data ?? []) as NetworkMessage[]
+    },
+    enabled: !!threadId,
+    refetchInterval: 15_000,
+  })
+}
+
+/** The thread with a given supplier, if one already exists. */
+export function useThreadWithSupplier(supplierProfileId: string | undefined) {
+  const { data: threads } = useNetworkThreads()
+  return useMemo(
+    () =>
+      (threads ?? []).find(
+        (t) => t.supplier_profile_id === supplierProfileId && t.i_am_buyer,
+      ) ?? null,
+    [threads, supplierProfileId],
+  )
+}
+
+export function useStartThread() {
+  const { business } = useActiveBusiness()
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (input: {
+      supplierProfileId: string
+      body: string
+      listingId?: string | null
+    }) => {
+      const { data, error } = await supabase.rpc('start_network_thread', {
+        p_business_id: business!.id,
+        p_supplier_profile_id: input.supplierProfileId,
+        p_body: input.body,
+        p_listing_id: input.listingId ?? null,
+      })
+      if (error) {
+        console.error('[start_network_thread] failed', { input, error })
+        throw error
+      }
+      return data as unknown as Database['public']['Tables']['network_threads']['Row']
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['network-threads', business?.id] })
+    },
+  })
+}
+
+export function useSendMessage() {
+  const { business } = useActiveBusiness()
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (input: { threadId: string; body: string }) => {
+      const { data, error } = await supabase.rpc('send_network_message', {
+        p_thread_id: input.threadId,
+        p_body: input.body,
+      })
+      if (error) {
+        console.error('[send_network_message] failed', { threadId: input.threadId, error })
+        throw error
+      }
+      return data as unknown as NetworkMessage
+    },
+    onSuccess: (_d, input) => {
+      qc.invalidateQueries({ queryKey: ['network-messages', input.threadId] })
+      qc.invalidateQueries({ queryKey: ['network-threads', business?.id] })
+    },
+  })
+}
+
+export function useMarkThreadRead() {
+  const { business } = useActiveBusiness()
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (threadId: string) => {
+      const { error } = await supabase.rpc('mark_network_thread_read', { p_thread_id: threadId })
+      if (error) {
+        console.error('[mark_network_thread_read] failed', { threadId, error })
+        throw error
+      }
+    },
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ['network-threads', business?.id] })
+    },
+  })
 }

@@ -1,5 +1,6 @@
 import { supabase } from '@/lib/supabase'
 import { toReadableError } from '@/lib/errors'
+import { NETWORK_IMAGE_BUCKET } from '@/lib/storage-buckets'
 
 const MAX_EDGE = 1200
 const TARGET_BYTES = 300 * 1024
@@ -99,6 +100,9 @@ export type ImageUploadTarget =
   // exist yet); it's known on edit. Both are valid — the policy only
   // requires the business ID to be the first path segment.
   | { kind: 'product-image'; productId?: string }
+  // A network listing photo. listingId is unknown while the listing is being
+  // created, same as above.
+  | { kind: 'network-listing'; listingId?: string }
 
 /**
  * Every storage object path begins with `{business_id}/...` — the storage
@@ -109,6 +113,11 @@ function buildImagePath(businessId: string, target: ImageUploadTarget): string {
   const uuid = crypto.randomUUID()
   if (target.kind === 'logo') {
     return `${businessId}/logo/${uuid}.webp`
+  }
+  if (target.kind === 'network-listing') {
+    return target.listingId
+      ? `${businessId}/listings/${target.listingId}/${uuid}.webp`
+      : `${businessId}/listings/${uuid}.webp`
   }
   return target.productId
     ? `${businessId}/products/${target.productId}/${uuid}.webp`
@@ -165,6 +174,21 @@ export async function createSignedImageUrls(
     if (item.signedUrl && item.path) map.set(item.path, item.signedUrl)
   }
   return map
+}
+
+/**
+ * The read path for the PUBLIC network-images bucket.
+ *
+ * Deliberately not createSignedImageUrl: the viewer of a marketplace photo is
+ * by definition not a member of the business that uploaded it, so signing —
+ * which is gated by is_member_of() on the first path segment — returns
+ * nothing. Calling the wrong one here fails silently as a missing image, so
+ * the bucket constant and this function are meant to be used together.
+ */
+export function networkImageUrl(path: string | null | undefined): string | undefined {
+  if (!path) return undefined
+  const { data } = supabase.storage.from(NETWORK_IMAGE_BUCKET).getPublicUrl(path)
+  return data.publicUrl
 }
 
 /** Friendly message in production; the real Supabase error in development, so a real failure is diagnosable without reproducing it against a live project. */

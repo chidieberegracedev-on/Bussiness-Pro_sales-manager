@@ -17,6 +17,7 @@ import {
   Wallet,
   Clock,
   BookOpen,
+  MessagesSquare,
   DollarSign,
   GraduationCap,
   BookA,
@@ -79,6 +80,7 @@ export const NAV_ITEMS: NavItem[] = [
     roles: MANAGEMENT,
     children: [
       { label: 'Marketplace', to: '/network', icon: Globe },
+      { label: 'Messages', to: '/network/messages', icon: MessagesSquare },
       { label: 'Connections', to: '/network/connections', icon: Link2 },
       { label: 'My storefront', to: '/network/my-profile', icon: Store },
       { label: 'What I sell', to: '/network/my-listings', icon: Package },
