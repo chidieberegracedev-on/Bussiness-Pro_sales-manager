@@ -17,6 +17,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Money } from '@/components/money/money'
 import { Skeleton } from '@/components/ui/skeleton'
+import { IconBadge } from '@/components/ui/icon-badge'
 import { PageHeader } from '@/components/layout/page-header'
 import { EmptyState } from '@/components/data/empty-state'
 import { ErrorState } from '@/components/data/error-state'
@@ -198,10 +199,10 @@ function StatTile({
   to?: string
 }) {
   const body = (
-    <div className="flex min-w-0 items-center gap-3 rounded-xl border border-border bg-card p-4 transition-colors hover:border-border-strong">
-      <span className="flex size-11 shrink-0 items-center justify-center rounded-full bg-accent-primary/10 text-accent-primary">
-        <Icon className="size-5" />
-      </span>
+    <div className="flex min-w-0 items-center gap-3 rounded-2xl bg-card p-4 shadow-e2 transition-shadow hover:shadow-e3">
+      <IconBadge tone="accent" size="lg">
+        <Icon />
+      </IconBadge>
       <div className="min-w-0">
         <p className="truncate text-xl font-bold tabular-nums text-text-primary">{value}</p>
         <p className="truncate text-xs text-text-muted">{label}</p>
@@ -228,7 +229,7 @@ function CategoryChip({
       className={cn(
         'min-h-9 rounded-full border px-3.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
         active
-          ? 'border-transparent bg-text-primary font-semibold text-background'
+          ? 'border-transparent bg-tint-accent font-semibold text-tint-accent-foreground'
           : 'border-border bg-surface text-text-secondary hover:bg-surface-muted hover:text-text-primary',
       )}
     >
@@ -242,13 +243,13 @@ function ProductCard({ product }: { product: MarketplaceProduct }) {
   const visible = expanded ? product.suppliers : product.suppliers.slice(0, 2)
 
   return (
-    <div className="flex h-full min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card">
+    <div className="flex h-full min-w-0 flex-col overflow-hidden rounded-2xl bg-card shadow-e2 transition-shadow hover:shadow-e3">
       <div className="flex min-w-0 items-start gap-3 p-3">
-        <span className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-muted">
+        <span className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-tint-accent/60">
           {product.imageUrl ? (
             <img src={product.imageUrl} alt="" className="size-full object-cover" loading="lazy" />
           ) : (
-            <Package className="size-6 text-text-muted" />
+            <Package className="size-7 text-tint-accent-foreground/60" />
           )}
         </span>
         <div className="min-w-0 flex-1">
@@ -256,11 +257,11 @@ function ProductCard({ product }: { product: MarketplaceProduct }) {
           <p className="truncate text-xs text-text-muted">
             {product.brand ?? product.category ?? 'Uncategorised'}
           </p>
-          <p className="mt-1 flex min-w-0 flex-wrap items-baseline gap-x-1.5">
+          <p className="mt-1.5 flex min-w-0 flex-wrap items-baseline gap-x-1.5">
             {product.fromPrice ? (
               <>
                 <span className="text-xs text-text-secondary">from</span>
-                <span className="truncate text-sm font-semibold text-accent-primary">
+                <span className="truncate text-base font-bold text-accent-primary">
                   <Money value={product.fromPrice} />
                 </span>
               </>
@@ -268,31 +269,32 @@ function ProductCard({ product }: { product: MarketplaceProduct }) {
               <span className="text-xs text-text-muted">Price on request</span>
             )}
           </p>
+          <p className="mt-1 text-xs font-medium text-text-secondary">
+            {product.supplierCount} supplier{product.supplierCount === 1 ? '' : 's'} offering this
+          </p>
         </div>
       </div>
 
-      <div className="border-t border-border px-3 py-2">
-        <p className="text-xs font-medium text-text-secondary">
-          {product.supplierCount} supplier{product.supplierCount === 1 ? '' : 's'} offering this
-        </p>
+      {/* The supplier list is a recessed well inside the card — one plane down,
+          so the card's own header still reads as the subject. */}
+      <div className="mx-3 mb-3 rounded-xl bg-background">
+        <ul className="divide-y divide-border-subtle">
+          {visible.map((row) => (
+            <SupplierOffer key={row.listing_id} row={row} />
+          ))}
+        </ul>
+
+        {product.suppliers.length > 2 && (
+          <button
+            type="button"
+            onClick={() => setExpanded((v) => !v)}
+            className="flex w-full items-center justify-center gap-1 rounded-b-xl border-t border-border-subtle py-2 text-xs font-medium text-accent-primary transition-colors hover:bg-tint-accent"
+          >
+            {expanded ? 'Show fewer' : `Compare all ${product.suppliers.length}`}
+            <ChevronDown className={cn('size-3.5 transition-transform', expanded && 'rotate-180')} />
+          </button>
+        )}
       </div>
-
-      <ul className="divide-y divide-border">
-        {visible.map((row) => (
-          <SupplierOffer key={row.listing_id} row={row} />
-        ))}
-      </ul>
-
-      {product.suppliers.length > 2 && (
-        <button
-          type="button"
-          onClick={() => setExpanded((v) => !v)}
-          className="mt-auto flex items-center justify-center gap-1 border-t border-border py-2 text-xs font-medium text-text-secondary transition-colors hover:bg-surface-muted hover:text-text-primary"
-        >
-          {expanded ? 'Show fewer' : `Compare all ${product.suppliers.length}`}
-          <ChevronDown className={cn('size-3.5 transition-transform', expanded && 'rotate-180')} />
-        </button>
-      )}
     </div>
   )
 }
@@ -334,7 +336,7 @@ function SupplierOffer({ row }: { row: MarketplaceRow }) {
         </div>
         <div className="shrink-0 text-right">
           {row.from_price ? (
-            <p className="text-sm font-semibold tabular-nums text-accent-primary">
+            <p className="text-sm font-bold tabular-nums text-accent-primary">
               <Money value={row.from_price} />
             </p>
           ) : (
@@ -361,6 +363,9 @@ function SupplierOffer({ row }: { row: MarketplaceRow }) {
           Min order {new Decimal(row.min_order_qty).toString()} {row.purchase_unit}
         </p>
         <div className="flex gap-1.5">
+          <Button size="sm" variant="ghost" asChild>
+            <Link to={`/network/listings/${row.listing_id}`}>Details</Link>
+          </Button>
           {existing?.status === 'accepted' ? (
             <Button size="sm" variant="outline" disabled>
               <Check className="size-3.5" /> Connected

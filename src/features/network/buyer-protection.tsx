@@ -1,4 +1,5 @@
 import { ShieldCheck, Info } from 'lucide-react'
+import { IconBadge, NotePanel } from '@/components/ui/icon-badge'
 import { cn } from '@/lib/utils'
 
 /**
@@ -23,27 +24,27 @@ import { cn } from '@/lib/utils'
  */
 export function BuyerProtectionNotice({ className }: { className?: string }) {
   return (
-    <div
-      className={cn(
-        'flex items-start gap-2.5 rounded-lg border border-border bg-surface-muted/50 p-3',
-        className,
-      )}
-    >
-      <ShieldCheck className="mt-0.5 size-4 shrink-0 text-text-muted" />
+    // A tinted note, not another white box. This is an aside about how money
+    // moves; giving it the same surface as the cards around it is what made it
+    // disappear into the page.
+    <NotePanel tone="info" className={cn('flex items-start gap-3', className)}>
+      <IconBadge tone="info" size="md" className="mt-0.5 bg-surface/70">
+        <ShieldCheck />
+      </IconBadge>
       <div className="min-w-0 text-sm">
-        <p className="flex flex-wrap items-center gap-2 font-medium text-text-primary">
+        <p className="flex flex-wrap items-center gap-2 font-semibold text-text-primary">
           Payment protection
-          <span className="rounded-full bg-surface-muted px-2 py-0.5 text-xs font-medium text-text-secondary">
+          <span className="rounded-full bg-surface/70 px-2 py-0.5 text-xs font-medium">
             Coming soon
           </span>
         </p>
-        <p className="mt-0.5 text-text-secondary">
+        <p className="mt-1 text-tint-info-foreground/90">
           Payment is arranged directly between you and the supplier for now — the same as any
           supplier you already deal with. Held payment, delivery confirmation and dispute handling
           are being built and are not available yet.
         </p>
       </div>
-    </div>
+    </NotePanel>
   )
 }
 

@@ -7,8 +7,11 @@
   /* Cards separate from the page by CONTRAST, not shadow: a soft warm gray
      page with white cards sitting on it. Pure white everywhere forces every
      boundary to be drawn with a drop-shadow, which is what reads as generic. */
-  --background: 40 22% 97%;
-  --background-subtle: 40 18% 95.5%;
+  /* Three readable levels, deepest first: page (96%) → section panel (98%,
+     warm) → card (pure white, lifted). One percent of lightness is enough
+     when the hue is warm and the card carries elevation-2. */
+  --background: 40 22% 96%;
+  --background-subtle: 40 18% 94.5%;
   --surface: 0 0% 100%;
   --surface-elevated: 0 0% 100%;
   /* Deeper than the page, or an image well reads as a hole in the card
@@ -38,6 +41,34 @@
   --warning: 38 92% 47%;
   --danger: 0 72% 51%;
   --info: 199 89% 48%;
+
+  /* Tints — the second temperature. Soft washes of each semantic hue, used as
+     surface behind icon badges, status pills and grouped panels. Low enough
+     saturation to read as texture; high enough to stop the all-neutral wash.
+     Each tint pairs with a `-tint-foreground` that meets AA on it. */
+  --tint-accent: 221 70% 96%;
+  --tint-accent-foreground: 221 70% 34%;
+  --tint-secondary: 262 60% 96.5%;
+  --tint-secondary-foreground: 262 55% 42%;
+  --tint-success: 142 50% 94.5%;
+  --tint-success-foreground: 142 62% 26%;
+  --tint-warning: 38 80% 94%;
+  --tint-warning-foreground: 30 75% 30%;
+  --tint-danger: 0 70% 96%;
+  --tint-danger-foreground: 0 65% 38%;
+  --tint-info: 199 70% 95%;
+  --tint-info-foreground: 201 75% 28%;
+  /* The neutral tint is elevation level 2 — a grouped section panel. Warm and
+     just off pure white, so it separates from BOTH the page below it and the
+     white cards sitting on it. */
+  --tint-neutral: 40 24% 98.4%;
+
+  /* Elevation. Three levels the eye can read: page → section surface →
+     lifted card, plus a fourth for things that genuinely float. Large radius,
+     low opacity, close offset — "gently raised", never stark. */
+  --elevation-1: 0 1px 2px hsl(30 20% 20% / 0.05);
+  --elevation-2: 0 1px 3px hsl(30 20% 20% / 0.06), 0 4px 12px hsl(30 20% 20% / 0.04);
+  --elevation-3: 0 2px 6px hsl(30 20% 20% / 0.07), 0 12px 28px hsl(30 20% 20% / 0.06);
 
   --radius: 0.625rem;
 
@@ -83,6 +114,29 @@
   --warning: 38 88% 60%;
   --danger: 0 72% 62%;
   --info: 199 84% 60%;
+
+  /* Dark tints are dim, desaturated surfaces — the hue reads, the panel still
+     recedes. The foregrounds go light, not dark. */
+  --tint-accent: 221 45% 19%;
+  --tint-accent-foreground: 217 90% 78%;
+  --tint-secondary: 262 40% 21%;
+  --tint-secondary-foreground: 262 80% 82%;
+  --tint-success: 142 35% 16%;
+  --tint-success-foreground: 142 60% 68%;
+  --tint-warning: 38 40% 17%;
+  --tint-warning-foreground: 38 88% 70%;
+  --tint-danger: 0 40% 19%;
+  --tint-danger-foreground: 0 80% 76%;
+  --tint-info: 199 45% 17%;
+  --tint-info-foreground: 199 84% 72%;
+  --tint-neutral: 224 16% 15%;
+
+  /* On dark, elevation reads from surface lightness rather than shadow, so the
+     shadows only deepen the seam — but they stay, or a lifted card loses its
+     edge entirely against a dark page. */
+  --elevation-1: 0 1px 2px hsl(224 40% 3% / 0.4);
+  --elevation-2: 0 1px 3px hsl(224 40% 3% / 0.5), 0 4px 12px hsl(224 40% 3% / 0.35);
+  --elevation-3: 0 2px 6px hsl(224 40% 3% / 0.55), 0 12px 28px hsl(224 40% 3% / 0.45);
 
   --card: var(--surface);
   --card-foreground: var(--text-primary);
@@ -143,10 +197,35 @@
   --color-input: hsl(var(--input));
   --color-ring: hsl(var(--ring));
 
+  /* bg-tint-accent / text-tint-accent-foreground, and so on for each hue. */
+  --color-tint-accent: hsl(var(--tint-accent));
+  --color-tint-accent-foreground: hsl(var(--tint-accent-foreground));
+  --color-tint-secondary: hsl(var(--tint-secondary));
+  --color-tint-secondary-foreground: hsl(var(--tint-secondary-foreground));
+  --color-tint-success: hsl(var(--tint-success));
+  --color-tint-success-foreground: hsl(var(--tint-success-foreground));
+  --color-tint-warning: hsl(var(--tint-warning));
+  --color-tint-warning-foreground: hsl(var(--tint-warning-foreground));
+  --color-tint-danger: hsl(var(--tint-danger));
+  --color-tint-danger-foreground: hsl(var(--tint-danger-foreground));
+  --color-tint-info: hsl(var(--tint-info));
+  --color-tint-info-foreground: hsl(var(--tint-info-foreground));
+  --color-tint-neutral: hsl(var(--tint-neutral));
+
+  /* shadow-e1 / shadow-e2 / shadow-e3 — the only shadows in the app. Anything
+     reaching for a raw Tailwind shadow-* is going around the elevation scale. */
+  --shadow-e1: var(--elevation-1);
+  --shadow-e2: var(--elevation-2);
+  --shadow-e3: var(--elevation-3);
+
+  /* A radius scale used with intent, not one rounded rectangle everywhere:
+     sm (6px) inputs and chips inside dense rows, md/lg (~8–10px) controls,
+     xl (14px) cards, 2xl (18px) image wells and hero panels, full pills. */
   --radius-sm: calc(var(--radius) - 4px);
   --radius-md: calc(var(--radius) - 2px);
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
+  --radius-2xl: calc(var(--radius) + 8px);
 }
 
 @layer base {

@@ -32,14 +32,15 @@ export function PosPage() {
         </div>
       </div>
 
-      {/* Desktop: persistent cart pane */}
-      <div className="hidden min-h-0 w-[340px] shrink-0 rounded-xl border border-border bg-card p-4 lg:block">
+      {/* Desktop: persistent cart pane. The one panel on this screen that
+          should read as lifted above the grid — shadow, no border. */}
+      <div className="hidden min-h-0 w-[340px] shrink-0 rounded-2xl bg-card p-4 shadow-e2 lg:block">
         <CartPanel onTakePayment={handleTakePayment} />
       </div>
 
       {/* Mobile: sticky summary bar opening a cart sheet */}
       {lines.length > 0 && (
-        <div className="fixed inset-x-0 bottom-0 z-30 border-t border-border bg-surface p-3 shadow-lg lg:hidden">
+        <div className="fixed inset-x-0 bottom-0 z-30 bg-surface p-3 shadow-e3 lg:hidden">
           <Button className="w-full justify-between" size="lg" onClick={() => setMobileCartOpen(true)}>
             <span className="flex items-center gap-2">
               <ShoppingCart className="size-4" />

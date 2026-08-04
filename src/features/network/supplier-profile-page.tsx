@@ -1,4 +1,4 @@
-import { useNavigate, useParams } from 'react-router-dom'
+import { Link, useNavigate, useParams } from 'react-router-dom'
 import Decimal from 'decimal.js'
 import {
   ArrowLeft,
@@ -11,9 +11,9 @@ import {
   Phone,
   Mail,
   Truck,
+  MessageSquare,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Card, CardContent } from '@/components/ui/card'
 import { Money } from '@/components/money/money'
 import { Skeleton } from '@/components/ui/skeleton'
 import { ErrorState } from '@/components/data/error-state'
@@ -95,49 +95,54 @@ export function SupplierProfilePage() {
         <ArrowLeft className="size-4" /> Network
       </Button>
 
-      <Card className="mb-4">
-        <CardContent className="flex flex-wrap items-start gap-4 pt-6">
-          <span className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-surface-muted">
+      {/* The storefront header is the identity block, so it gets the one
+          tinted surface on the page — the store mark sits in a circular badge
+          on white, and the trust facts as pills on top of the tint. */}
+      <div className="mb-4 rounded-2xl bg-tint-accent p-5 sm:p-6">
+        <div className="flex flex-wrap items-start gap-4">
+          <span className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-surface shadow-e1">
             {profile.logo_url ? (
               <img src={profile.logo_url} alt="" className="size-full object-cover" />
             ) : (
-              <Store className="size-7 text-text-muted" />
+              <Store className="size-7 text-tint-accent-foreground" />
             )}
           </span>
 
           <div className="min-w-0 flex-1">
             <div className="flex flex-wrap items-center gap-2">
-              <h1 className="truncate text-xl font-bold tracking-tight text-text-primary">
+              <h1 className="truncate text-2xl font-bold tracking-tight text-text-primary">
                 {profile.display_name}
               </h1>
-              <TrustTierBadge tier={profile.trust_tier} />
+              <TrustTierBadge tier={profile.trust_tier} className="bg-surface/80" />
               {profile.verification === 'verified' && (
                 <VerificationBadge verification={profile.verification} />
               )}
             </div>
-            <p className="mt-1 text-xs text-text-muted">{TIER_MEANING[normaliseTier(profile.trust_tier)]}</p>
+            <p className="mt-1.5 text-xs text-tint-accent-foreground">
+              {TIER_MEANING[normaliseTier(profile.trust_tier)]}
+            </p>
             {profile.location_text && (
-              <p className="mt-0.5 flex items-center gap-1.5 text-sm text-text-secondary">
-                <MapPin className="size-3.5 text-text-muted" /> {profile.location_text}
+              <p className="mt-1 flex items-center gap-1.5 text-sm font-medium text-text-secondary">
+                <MapPin className="size-3.5 text-tint-accent-foreground" /> {profile.location_text}
               </p>
             )}
             {profile.description && (
               <p className="mt-2 max-w-prose text-sm text-text-secondary">{profile.description}</p>
             )}
-            <TrustIndicators facts={profile} className="mt-3" />
+            <TrustIndicators facts={profile} className="mt-3.5" />
           </div>
 
           <div className="flex shrink-0 flex-col gap-2">
             {isMine ? (
-              <Button variant="outline" onClick={() => navigate('/network/my-profile')}>
+              <Button variant="outline" className="bg-surface" onClick={() => navigate('/network/my-profile')}>
                 Edit storefront
               </Button>
             ) : existing?.status === 'accepted' ? (
-              <Button variant="outline" disabled>
+              <Button variant="outline" className="bg-surface" disabled>
                 <Check className="size-4" /> Connected
               </Button>
             ) : existing?.status === 'requested' ? (
-              <Button variant="outline" disabled>
+              <Button variant="outline" className="bg-surface" disabled>
                 <Loader2 className="size-4" /> Request sent
               </Button>
             ) : (
@@ -145,31 +150,30 @@ export function SupplierProfilePage() {
                 <Link2 className="size-4" /> Connect
               </Button>
             )}
+            {!isMine && id && (
+              <Button variant="outline" className="bg-surface" asChild>
+                <Link to={`/network/messages/${id}`}>
+                  <MessageSquare className="size-4" /> Message
+                </Link>
+              </Button>
+            )}
           </div>
-        </CardContent>
-      </Card>
+        </div>
 
-      {(profile.contact_phone || profile.contact_email || profile.min_order_note) && (
-        <Card className="mb-4">
-          <CardContent className="flex flex-wrap gap-x-6 gap-y-2 pt-6 text-sm">
+        {(profile.contact_phone || profile.contact_email || profile.min_order_note) && (
+          <div className="mt-4 flex flex-wrap gap-2 border-t border-tint-accent-foreground/15 pt-4 text-sm">
             {profile.contact_phone && (
-              <span className="flex items-center gap-1.5 text-text-secondary">
-                <Phone className="size-3.5 text-text-muted" /> {profile.contact_phone}
-              </span>
+              <ContactChip icon={Phone}>{profile.contact_phone}</ContactChip>
             )}
             {profile.contact_email && (
-              <span className="flex items-center gap-1.5 text-text-secondary">
-                <Mail className="size-3.5 text-text-muted" /> {profile.contact_email}
-              </span>
+              <ContactChip icon={Mail}>{profile.contact_email}</ContactChip>
             )}
             {profile.min_order_note && (
-              <span className="flex items-center gap-1.5 text-text-secondary">
-                <Truck className="size-3.5 text-text-muted" /> {profile.min_order_note}
-              </span>
+              <ContactChip icon={Truck}>{profile.min_order_note}</ContactChip>
             )}
-          </CardContent>
-        </Card>
-      )}
+          </div>
+        )}
+      </div>
 
       <BuyerProtectionNotice className="mb-4" />
 
@@ -208,13 +212,18 @@ export function SupplierProfilePage() {
  */
 function ListingCard({ listing }: { listing: ListingWithTiers }) {
   return (
-    <div className="flex h-full min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card">
-      <div className="flex min-w-0 items-start gap-3 p-3">
-        <span className="flex size-12 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-surface-muted">
+    <Link
+      to={`/network/listings/${listing.id}`}
+      className="flex h-full min-w-0 flex-col rounded-2xl bg-card p-3 shadow-e2 transition-shadow hover:shadow-e3"
+    >
+      <div className="flex min-w-0 items-start gap-3">
+        {/* The image well is the focal shape — larger radius than the card's
+            inner controls, on a tint rather than another gray square. */}
+        <span className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-tint-accent/60">
           {listing.product?.image_url ? (
             <img src={listing.product.image_url} alt="" className="size-full object-cover" />
           ) : (
-            <Package className="size-5 text-text-muted" />
+            <Package className="size-6 text-tint-accent-foreground/60" />
           )}
         </span>
         <div className="min-w-0 flex-1">
@@ -234,33 +243,51 @@ function ListingCard({ listing }: { listing: ListingWithTiers }) {
         </div>
       </div>
 
+      {/* The price breaks are the reason a buyer is on this card, so they get
+          their own recessed surface rather than three more hairline rules. */}
       {listing.tiers.length > 0 ? (
-        <ul className="mt-auto divide-y divide-border border-t border-border">
+        <ul className="mt-3 space-y-0.5 rounded-xl bg-background p-2">
           {listing.tiers.map((tier) => (
             <li
               key={tier.id}
-              className="flex min-w-0 items-center justify-between gap-2 px-3 py-1.5 text-sm"
+              className="flex min-w-0 items-center justify-between gap-2 px-1 py-1 text-sm"
             >
               <span className="truncate text-text-secondary">
                 {tierLabel(tier.min_qty, tier.max_qty, listing.purchase_unit)}
               </span>
-              <span className="shrink-0 font-semibold tabular-nums text-accent-primary">
+              <span className="shrink-0 font-bold tabular-nums text-accent-primary">
                 <Money value={tier.unit_price} />
               </span>
             </li>
           ))}
         </ul>
       ) : (
-        <p className="mt-auto border-t border-border px-3 py-2 text-xs text-text-muted">
+        <p className="mt-3 rounded-xl bg-background px-3 py-2 text-xs text-text-muted">
           No published prices — ask for a quote.
         </p>
       )}
 
-      <p className="border-t border-border px-3 py-2 text-xs text-text-muted">
+      <p className="mt-auto px-1 pt-2.5 text-xs text-text-muted">
         Minimum order {new Decimal(listing.min_order_qty).toString()} {listing.purchase_unit}
         {listing.availability !== 'active' && ' · currently unavailable'}
       </p>
-    </div>
+    </Link>
+  )
+}
+
+/** A contact fact, on its own white pill so it reads against the tinted header. */
+function ContactChip({
+  icon: Icon,
+  children,
+}: {
+  icon: React.ComponentType<{ className?: string }>
+  children: React.ReactNode
+}) {
+  return (
+    <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full bg-surface px-3 py-1.5 text-sm text-text-secondary shadow-e1">
+      <Icon className="size-3.5 shrink-0 text-accent-primary" />
+      <span className="truncate">{children}</span>
+    </span>
   )
 }
 

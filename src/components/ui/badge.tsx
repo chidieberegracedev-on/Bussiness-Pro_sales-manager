@@ -13,10 +13,14 @@ const badgeVariants = cva(
         default: 'border-transparent bg-primary text-primary-foreground',
         secondary: 'border-transparent bg-secondary text-secondary-foreground',
         outline: 'border-border text-text-primary',
-        success: 'border-transparent bg-success/15 text-success',
-        warning: 'border-transparent bg-warning/15 text-warning',
-        danger: 'border-transparent bg-danger/15 text-danger',
-        info: 'border-transparent bg-info/15 text-info',
+        // Soft tinted pills, not gray-on-gray. Each pairs a designed tint
+        // surface with a foreground that meets AA on it — `bg-success/15
+        // text-success` did neither reliably.
+        accent: 'border-transparent bg-tint-accent text-tint-accent-foreground',
+        success: 'border-transparent bg-tint-success text-tint-success-foreground',
+        warning: 'border-transparent bg-tint-warning text-tint-warning-foreground',
+        danger: 'border-transparent bg-tint-danger text-tint-danger-foreground',
+        info: 'border-transparent bg-tint-info text-tint-info-foreground',
         muted: 'border-transparent bg-surface-muted text-text-muted',
       },
     },

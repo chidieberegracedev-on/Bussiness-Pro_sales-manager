@@ -29,17 +29,19 @@ const TIER_ICON: Record<TrustTier, typeof BadgeCheck> = {
   preferred: Star,
 }
 
-const TIER_VARIANT: Record<TrustTier, 'muted' | 'success' | 'info'> = {
-  provisional: 'muted',
+const TIER_VARIANT: Record<TrustTier, 'accent' | 'success' | 'info'> = {
+  // Soft accent, not gray: "new" is an invitation, and a gray-on-gray chip
+  // reads as "unremarkable" next to a green Verified one.
+  provisional: 'accent',
   verified: 'success',
   trusted: 'success',
   preferred: 'info',
 }
 
 /**
- * The tier badge. "New supplier" is deliberately neutral rather than a warning
- * colour — being new is not a fault, and colouring it as one would push every
- * buyer away from exactly the suppliers the network needs to attract.
+ * The tier badge. "New supplier" is deliberately not a warning colour — being
+ * new is not a fault, and colouring it as one would push every buyer away from
+ * exactly the suppliers the network needs to attract.
  */
 export function TrustTierBadge({
   tier,
@@ -173,10 +175,15 @@ export function TrustIndicators({
       {items.map((item) => (
         <li
           key={item.label}
-          className="inline-flex min-w-0 items-center gap-1 text-xs text-text-secondary"
+          // A pill on its own surface, so a fact reads as a fact rather than
+          // as one more grey run-on line under the description.
+          className={cn(
+            'inline-flex min-w-0 items-center gap-1.5 text-xs text-text-secondary',
+            !compact && 'rounded-full bg-surface px-2.5 py-1 shadow-e1',
+          )}
         >
-          <item.icon className="size-3.5 shrink-0 text-text-muted" aria-hidden="true" />
-          <span className="font-medium text-text-primary">{item.value}</span>
+          <item.icon className="size-3.5 shrink-0 text-accent-primary" aria-hidden="true" />
+          <span className="font-semibold text-text-primary">{item.value}</span>
           {!compact && <span className="truncate">{item.label}</span>}
         </li>
       ))}

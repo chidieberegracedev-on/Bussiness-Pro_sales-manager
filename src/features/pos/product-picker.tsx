@@ -68,19 +68,25 @@ function ProductTile({ product, imageUrl }: { product: GroupedProduct; imageUrl:
         // A card is a fixed box. Everything inside reflows within it — the card
         // width drives the content, never the other way round, which is what
         // stops a long price or a badge escaping when the cart panel expands.
-        'flex h-full w-full min-w-0 flex-col overflow-hidden rounded-xl border border-border bg-card text-left transition-colors hover:border-border-strong',
+        'flex h-full w-full min-w-0 flex-col rounded-2xl bg-card p-2 text-left',
+        // Level 3: a product card lifts off the page. Shadow, not border —
+        // carrying both is what flattened every surface into one plane.
+        'shadow-e2 transition-shadow duration-150 hover:shadow-e3',
         !product.isActive && 'opacity-60',
       )}
     >
-      <div className="flex aspect-[4/3] w-full shrink-0 items-center justify-center overflow-hidden bg-surface-muted">
+      {/* The focal shape. Inset by the card's own padding and rounded harder
+          than the card, so the image reads as the subject rather than as a
+          bordered box inside a box. */}
+      <div className="flex aspect-[4/3] w-full shrink-0 items-center justify-center overflow-hidden rounded-xl bg-tint-accent/60">
         {imageUrl ? (
           <img src={imageUrl} alt="" className="size-full object-cover" loading="lazy" />
         ) : (
-          <Package className="size-8 text-text-muted" />
+          <Package className="size-8 text-tint-accent-foreground/50" />
         )}
       </div>
 
-      <div className="flex min-w-0 flex-1 flex-col gap-1 p-2.5">
+      <div className="flex min-w-0 flex-1 flex-col gap-0.5 px-1 pb-0.5 pt-2.5">
         {/* One line, always. A two-line name on one card and one on the next is
             what made the rows sit at different heights. */}
         <p className="truncate text-sm font-semibold leading-snug text-text-primary">
@@ -94,8 +100,10 @@ function ProductTile({ product, imageUrl }: { product: GroupedProduct; imageUrl:
 
         {/* min-w-0 on both children is the fix for the pop-out: without it a
             flex child refuses to shrink below its content and overflows. */}
-        <div className="mt-auto flex min-w-0 items-center justify-between gap-1.5 pt-1">
-          <span className="min-w-0 truncate text-[clamp(0.75rem,1.1vw,0.875rem)] font-semibold text-accent-primary">
+        <div className="mt-auto flex min-w-0 items-center justify-between gap-1.5 pt-2">
+          {/* The price is the data anchor — heavier and in accent, so the eye
+              lands on it before the meta line. */}
+          <span className="min-w-0 truncate text-[clamp(0.8125rem,1.1vw,0.9375rem)] font-bold text-accent-primary">
             <Money value={product.priceMin} />
             {product.priceMin !== product.priceMax && '+'}
           </span>
@@ -175,9 +183,9 @@ export function ProductPicker() {
         />
       </div>
 
-      {/* Chips are navigation, not the point of the screen. They select with a
-          neutral fill so the accent stays reserved for Take payment — one
-          accent per screen is what makes that button read as the next step. */}
+      {/* Chips are navigation, not the point of the screen. The selected one
+          takes a soft accent TINT — ambient colour, not a solid accent fill,
+          so Take payment is still the only saturated thing on screen. */}
       <div className="flex flex-wrap gap-1.5">
         <CategoryChip active={categoryId === 'all'} onClick={() => setCategoryId('all')}>
           All
@@ -222,7 +230,8 @@ export function ProductPicker() {
 /**
  * A filter chip. Deliberately not a Button: `variant="default"` would give it
  * the same accent and weight as Take payment, and when everything on screen
- * carries the accent, nothing does. Selection reads through a neutral fill.
+ * carries the accent, nothing does. Selection reads through an accent tint —
+ * full pill radius, so it can never be mistaken for a card or a control.
  */
 function CategoryChip({
   active,
@@ -241,7 +250,7 @@ function CategoryChip({
       className={cn(
         'min-h-11 rounded-full border px-3.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
         active
-          ? 'border-transparent bg-text-primary font-semibold text-background'
+          ? 'border-transparent bg-tint-accent font-semibold text-tint-accent-foreground'
           : 'border-border bg-surface text-text-secondary hover:bg-surface-muted hover:text-text-primary',
       )}
     >

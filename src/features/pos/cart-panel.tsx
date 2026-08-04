@@ -67,24 +67,26 @@ export function CartPanel({
               return (
                 <li
                   key={line.variantId}
-                  className="group flex min-w-0 items-center gap-2.5 rounded-lg border border-border p-2"
+                  // No border: inside a lifted panel, a row is a row. Boxing
+                  // each one turned the cart into a stack of little cards.
+                  className="group flex min-w-0 items-center gap-2.5 rounded-xl p-2 transition-colors hover:bg-background"
                 >
-                  <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-md bg-surface-muted">
+                  <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-tint-accent/60">
                     {url ? (
                       <img src={url} alt="" className="size-full object-cover" />
                     ) : (
-                      <Package className="size-4 text-text-muted" />
+                      <Package className="size-4 text-tint-accent-foreground/50" />
                     )}
                   </span>
 
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-medium text-text-primary">
+                    <p className="truncate text-sm font-semibold text-text-primary">
                       {line.productName}
                     </p>
                     <p className="truncate text-xs text-text-muted">
                       {line.variantName ?? line.baseUnit}
                     </p>
-                    <p className="truncate text-sm font-semibold text-accent-primary">
+                    <p className="truncate text-sm font-bold text-accent-primary">
                       <Money value={line.quantity.times(line.unitPrice)} />
                     </p>
                   </div>
@@ -100,6 +102,7 @@ export function CartPanel({
                       {line.quantity.toString()}
                     </span>
                     <StepperButton
+                      tone="accent"
                       label={`Increase quantity of ${line.productName}`}
                       onClick={() => setQuantity(line.variantId, line.quantity.plus(1))}
                     >
@@ -172,10 +175,13 @@ function StepperButton({
   label,
   onClick,
   children,
+  tone = 'neutral',
 }: {
   label: string
   onClick: () => void
   children: React.ReactNode
+  /** Add carries a soft accent tint — it is the direction the cart grows. */
+  tone?: 'neutral' | 'accent'
 }) {
   return (
     <button
@@ -183,9 +189,11 @@ function StepperButton({
       onClick={onClick}
       aria-label={label}
       className={cn(
-        'flex size-7 items-center justify-center rounded-full border border-border text-text-secondary transition-colors',
-        'hover:bg-surface-muted hover:text-text-primary',
+        'flex size-7 items-center justify-center rounded-full transition-colors',
         'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-1 focus-visible:ring-offset-background',
+        tone === 'accent'
+          ? 'bg-tint-accent text-tint-accent-foreground hover:bg-accent-primary hover:text-primary-foreground'
+          : 'border border-border text-text-secondary hover:bg-surface-muted hover:text-text-primary',
       )}
     >
       {children}

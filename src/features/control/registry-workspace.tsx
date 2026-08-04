@@ -22,6 +22,7 @@ import { PaymentDialog } from '@/features/pos/payment-dialog'
 import { useCartStore, cartSubtotal } from '@/features/pos/cart-store'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
+import { IconBadge } from '@/components/ui/icon-badge'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Money } from '@/components/money/money'
 import { Skeleton } from '@/components/ui/skeleton'
@@ -180,9 +181,9 @@ export function RegistryWorkspace() {
       <header className="shrink-0 border-b border-border bg-surface px-4 py-2.5">
         <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
           <div className="flex items-center gap-2.5">
-            <span className="flex size-9 items-center justify-center rounded-full bg-accent-primary/10 text-sm font-semibold text-accent-primary">
+            <IconBadge tone="accent" size="md" className="text-sm font-semibold">
               {(operatorName || '?').slice(0, 1).toUpperCase()}
-            </span>
+            </IconBadge>
             <div>
               <p className="text-sm font-semibold leading-tight text-text-primary">
                 {operatorName || 'Operator'}
@@ -213,7 +214,7 @@ export function RegistryWorkspace() {
               <span className="font-medium text-accent-primary">· Close</span>
             </button>
           ) : (
-            <span className="flex items-center gap-1.5 text-xs text-warning">
+            <span className="inline-flex items-center gap-1.5 rounded-full bg-tint-warning px-2.5 py-1 text-xs font-medium text-tint-warning-foreground">
               <Clock className="size-3.5" /> No shift open
             </span>
           )}
@@ -249,9 +250,9 @@ export function RegistryWorkspace() {
       {/* A warning with no way to act on it is just noise. The button is the
           point of the banner. */}
       {!openShift && !shiftLoading && (
-        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 border-b border-warning/30 bg-warning/5 px-4 py-2.5">
-          <AlertTriangle className="size-4 shrink-0 text-warning" />
-          <p className="min-w-0 flex-1 text-sm text-text-secondary">
+        <div className="flex flex-wrap items-center gap-x-3 gap-y-2 bg-tint-warning px-4 py-2.5">
+          <AlertTriangle className="size-4 shrink-0 text-tint-warning-foreground" />
+          <p className="min-w-0 flex-1 text-sm text-tint-warning-foreground">
             No shift is open on this terminal. Cash sales won't be attached to a drawer until one is
             opened.
           </p>
@@ -271,7 +272,7 @@ export function RegistryWorkspace() {
         </div>
 
         <div className="hidden min-h-0 w-[340px] shrink-0 flex-col gap-3 lg:flex">
-          <div className="min-h-0 flex-1 rounded-xl border border-border bg-card p-4">
+          <div className="min-h-0 flex-1 rounded-2xl bg-card p-4 shadow-e2">
             <CartPanel
               onTakePayment={() => setPaymentOpen(true)}
               onRemoveLine={voidLine}
@@ -280,7 +281,7 @@ export function RegistryWorkspace() {
           </div>
 
           {/* Registry control tools */}
-          <Card>
+          <Card elevation="raised" className="rounded-2xl">
             <CardContent className="grid grid-cols-3 gap-2 pt-4">
               <ToolButton icon={PauseCircle} label="Hold" onClick={hold} disabled={lines.length === 0} />
               <ToolButton icon={PlayCircle} label="Resume" onClick={() => setHeldOpen(true)} />
@@ -334,7 +335,7 @@ export function RegistryWorkspace() {
           </Card>
 
           {/* Private shift stats — drawer-scoped only, never business-wide */}
-          <Card>
+          <Card elevation="raised" className="rounded-2xl">
             <CardContent className="space-y-1.5 pt-4 text-sm">
               <div className="flex items-center justify-between">
                 <p className="text-xs font-semibold uppercase tracking-wide text-text-muted">
@@ -405,9 +406,11 @@ export function RegistryWorkspace() {
                   )
                 }
               />
-              <div className="mt-2 flex items-center justify-between border-t border-border pt-2">
-                <span className="text-text-secondary">Expected in drawer</span>
-                <span className="font-semibold tabular-nums text-text-primary">
+              {/* The conclusion of the column, so it gets the accent and the
+                  weight — the rows above are inputs to it. */}
+              <div className="mt-2 flex items-center justify-between border-t border-dashed border-border pt-2.5">
+                <span className="font-medium text-text-secondary">Expected in drawer</span>
+                <span className="text-base font-bold tabular-nums text-accent-primary">
                   <Money value={drawerCash} />
                 </span>
               </div>
@@ -420,7 +423,7 @@ export function RegistryWorkspace() {
 
       {/* Mobile basket bar */}
       {lines.length > 0 && (
-        <div className="sticky inset-x-0 bottom-0 z-30 border-t border-border bg-surface p-3 shadow-lg lg:hidden">
+        <div className="sticky inset-x-0 bottom-0 z-30 bg-surface p-3 shadow-e3 lg:hidden">
           <Button className="w-full justify-between" size="lg" onClick={() => setMobileCartOpen(true)}>
             <span className="flex items-center gap-2">
               <ShoppingCart className="size-4" />
@@ -495,10 +498,12 @@ function ToolButton({
       type="button"
       onClick={onClick}
       disabled={disabled}
-      className={`flex flex-col items-center gap-1 rounded-lg border px-2 py-2.5 text-xs font-medium transition-colors disabled:opacity-40 ${
+      // Recessed chips on the card rather than seven more outlined boxes: the
+      // tool grid reads as one cluster, and the card keeps the only edge.
+      className={`flex flex-col items-center gap-1 rounded-xl px-2 py-2.5 text-xs font-medium transition-colors disabled:opacity-40 ${
         danger
-          ? 'border-danger/30 text-danger hover:bg-danger/5'
-          : 'border-border text-text-secondary hover:bg-surface-muted hover:text-text-primary'
+          ? 'bg-tint-danger text-tint-danger-foreground hover:bg-danger/20'
+          : 'bg-background text-text-secondary hover:bg-surface-muted hover:text-text-primary'
       }`}
     >
       <Icon className="size-4" />
