@@ -18,14 +18,20 @@
      rather than part of it. */
   --surface-muted: 40 13% 92.5%;
 
-  /* Near-neutral with a trace of warmth, so text doesn't read cold-blue
-     against a warm ground. */
-  --text-primary: 30 12% 13%;
-  --text-secondary: 30 7% 39%;
-  /* 42% keeps muted text at 5.2:1 on a card and 4.8:1 on the page. The old
-     value sat at 3.6:1 — below AA. Muting is a hierarchy signal, not a licence
-     to make text hard to read. */
-  --text-muted: 30 6% 42%;
+  /* FOUR text levels, and the gaps between them are deliberate. The previous
+     set ran 13% → 39% → 42% — secondary and muted were three points apart,
+     which is not a hierarchy, it is a rounding error. A page title and the
+     metadata under it looked like the same kind of text.
+
+     primary   near-black. Titles, headings, nav labels, card titles, numbers.
+     secondary controlled dark gray. Body copy, descriptions.
+     muted     metadata, timestamps, helper text. Still AA on every surface.
+     disabled  genuinely inactive. The only level allowed to fail AA, because
+               it is marking something you cannot interact with. */
+  --text-primary: 30 10% 9%;
+  --text-secondary: 30 7% 32%;
+  --text-muted: 30 6% 46%;
+  --text-disabled: 30 5% 66%;
 
   /* Hairlines. --border is the workhorse that replaces every card shadow, so
      it stays low-contrast: visible as a boundary, never as a line you notice. */
@@ -98,9 +104,10 @@
   --surface-elevated: 224 16% 15%;
   --surface-muted: 224 16% 17%;
 
-  --text-primary: 210 20% 96%;
-  --text-secondary: 215 16% 72%;
+  --text-primary: 210 20% 98%;
+  --text-secondary: 215 16% 76%;
   --text-muted: 215 14% 58%;
+  --text-disabled: 215 12% 42%;
 
   --border: 224 14% 22%;
   --border-subtle: 224 14% 17%;
@@ -166,6 +173,16 @@
   --color-text-primary: hsl(var(--text-primary));
   --color-text-secondary: hsl(var(--text-secondary));
   --color-text-muted: hsl(var(--text-muted));
+  --color-text-disabled: hsl(var(--text-disabled));
+
+  /* Icon tokens. An icon is not automatically the accent colour — an interface
+     where every glyph is brand-coloured has no way left to say "this one".
+     `text-icon` is the default: a dark neutral that reads as structure.
+     `text-icon-muted` is for decoration next to metadata. The accent stays for
+     active nav, selected state, and status. */
+  --color-icon: hsl(var(--text-secondary));
+  --color-icon-muted: hsl(var(--text-muted));
+  --color-icon-strong: hsl(var(--text-primary));
 
   --color-border-subtle: hsl(var(--border-subtle));
   --color-border-strong: hsl(var(--border-strong));
@@ -226,6 +243,17 @@
   --radius-lg: var(--radius);
   --radius-xl: calc(var(--radius) + 4px);
   --radius-2xl: calc(var(--radius) + 8px);
+
+  /* One family, loaded with the weights the scale below actually uses. Inter
+     is the substrate; the hierarchy comes from size and weight, not from
+     mixing typefaces. Every entry has a real fallback stack — the font is an
+     upgrade, never a dependency. */
+  --font-sans:
+    'Inter', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', Roboto,
+    'Helvetica Neue', Arial, sans-serif;
+  /* Tabular figures for money, quantities and counts, so columns of numbers
+     line up and a changing total doesn't make the row jitter. */
+  --font-mono: ui-monospace, 'SF Mono', SFMono-Regular, Menlo, monospace;
 }
 
 @layer base {
@@ -235,5 +263,82 @@
   body {
     @apply bg-background text-text-primary antialiased;
     font-synthesis: none;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Typography scale                                                     */
+  /*                                                                      */
+  /* Five levels, each distinguishable from its neighbour by BOTH size    */
+  /* and weight. The failure this replaces was everything landing on      */
+  /* text-sm/font-medium, so a page title, a card title and a timestamp   */
+  /* all read as the same kind of thing.                                  */
+  /*                                                                      */
+  /*   .type-display   page title      30/700  tight tracking             */
+  /*   .type-title     section heading 20/650                             */
+  /*   .type-heading   card title      15/600                             */
+  /*   .type-body      body copy       14/400  secondary                  */
+  /*   .type-meta      metadata        12.5/500 muted                     */
+  /*                                                                      */
+  /* Negative tracking on the large sizes only: it tightens a headline    */
+  /* and damages small text.                                              */
+  /* ------------------------------------------------------------------ */
+  .type-display {
+    @apply text-[1.875rem] font-bold leading-[1.15] tracking-[-0.022em] text-text-primary;
+  }
+  .type-title {
+    @apply text-xl font-semibold leading-snug tracking-[-0.014em] text-text-primary;
+  }
+  .type-heading {
+    @apply text-[0.9375rem] font-semibold leading-snug text-text-primary;
+  }
+  .type-body {
+    @apply text-sm font-normal leading-relaxed text-text-secondary;
+  }
+  .type-meta {
+    @apply text-[0.78125rem] font-medium leading-normal text-text-muted;
+  }
+  /* Section eyebrow — the small all-caps label above a group. Letter-spaced
+     because all-caps at 11px is unreadable without it. */
+  .type-eyebrow {
+    @apply text-[0.6875rem] font-bold uppercase leading-none tracking-[0.06em] text-text-muted;
+  }
+
+  /* ------------------------------------------------------------------ */
+  /* Scrollbars                                                          */
+  /*                                                                     */
+  /* The default chrome on Linux/Windows is a wide inset trough with     */
+  /* arrow buttons that dates the whole app. This replaces it globally   */
+  /* with a thin, rounded, low-contrast overlay thumb that darkens on    */
+  /* hover, in both themes.                                              */
+  /*                                                                     */
+  /* Firefox gets `scrollbar-width`/`scrollbar-color`; WebKit gets the   */
+  /* pseudo-elements. `background-clip: padding-box` plus a transparent  */
+  /* border is what insets the thumb inside the track without needing a  */
+  /* narrower scrollbar — a 4px-wide scrollbar is very hard to grab.     */
+  /* ------------------------------------------------------------------ */
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--border-strong)) transparent;
+  }
+  ::-webkit-scrollbar {
+    width: 12px;
+    height: 12px;
+  }
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+  ::-webkit-scrollbar-thumb {
+    background-color: hsl(var(--border-strong));
+    border: 3px solid transparent;
+    background-clip: padding-box;
+    border-radius: 999px;
+  }
+  ::-webkit-scrollbar-thumb:hover {
+    background-color: hsl(var(--text-disabled));
+  }
+  /* The little square where a vertical and horizontal bar meet, which
+     otherwise renders as a raised grey box. */
+  ::-webkit-scrollbar-corner {
+    background: transparent;
   }
 }

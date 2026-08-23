@@ -4,15 +4,20 @@ import { cva, type VariantProps } from 'class-variance-authority'
 import { cn } from '@/lib/utils'
 
 const buttonVariants = cva(
-  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-md text-sm font-medium transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
+  // font-semibold, not font-medium: a button label is an action, and at 14px
+  // medium reads as body text with a box around it.
+  "inline-flex items-center justify-center gap-2 whitespace-nowrap rounded-lg text-sm font-semibold transition-colors disabled:pointer-events-none disabled:opacity-50 [&_svg]:pointer-events-none [&_svg]:size-4 [&_svg]:shrink-0 outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background",
   {
     variants: {
       variant: {
         default: 'bg-primary text-primary-foreground hover:bg-primary/90',
         destructive: 'bg-destructive text-destructive-foreground hover:bg-destructive/90',
-        outline: 'border border-border bg-surface hover:bg-surface-muted text-text-primary',
+        // Secondary actions get a near-black label and a real border, so they
+        // read as available rather than half-disabled.
+        outline:
+          'border border-border-strong bg-surface text-text-primary hover:border-text-disabled hover:bg-surface-muted',
         secondary: 'bg-secondary text-secondary-foreground hover:bg-secondary/80',
-        ghost: 'hover:bg-surface-muted text-text-primary',
+        ghost: 'text-text-secondary hover:bg-surface-muted hover:text-text-primary',
         link: 'text-primary underline-offset-4 hover:underline',
       },
       size: {

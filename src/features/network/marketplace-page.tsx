@@ -55,7 +55,9 @@ import { cn } from '@/lib/utils'
 export function MarketplacePage() {
   const [params, setParams] = useSearchParams()
   const [search, setSearch] = useState(params.get('q') ?? '')
-  const [category, setCategory] = useState<string | 'all'>('all')
+  // Seeded from the URL so a category chip on Home lands here already filtered,
+  // and so the filtered view is a shareable link rather than transient state.
+  const [category, setCategory] = useState<string | 'all'>(params.get('category') ?? 'all')
   const debounced = useDebouncedValue(search, 300)
   const canonicalFilter = params.get('product') ?? undefined
 
@@ -83,8 +85,9 @@ export function MarketplacePage() {
   return (
     <div>
       <PageHeader
-        title="Network"
-        description="Find suppliers, compare what they charge, and connect with the ones you want to buy from. Nothing here can see your costs, your margins, or your stock."
+        eyebrow="Supplier Network"
+        title="Search products"
+        description="Every product on the network, grouped so four suppliers of the same thing are one row to compare — not four to scroll past."
         actions={
           <div className="flex flex-wrap gap-2">
             {unread > 0 && (

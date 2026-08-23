@@ -54,7 +54,7 @@ export function MessagesPage() {
           description="Open a supplier or a listing on the network and ask a question — lead time, delivery, or a price at your quantity."
           action={
             <Button asChild>
-              <Link to="/network">
+              <Link to="/network/search">
                 <Store className="size-4" /> Browse the network
               </Link>
             </Button>

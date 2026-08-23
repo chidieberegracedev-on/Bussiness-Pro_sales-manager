@@ -103,7 +103,7 @@ export function CanonicalLink({
           </p>
         </div>
         <Button variant="outline" size="sm" asChild>
-          <Link to={`/network?product=${linked.id}`}>
+          <Link to={`/network/search?product=${linked.id}`}>
             <Globe className="size-3.5" /> Find suppliers
           </Link>
         </Button>

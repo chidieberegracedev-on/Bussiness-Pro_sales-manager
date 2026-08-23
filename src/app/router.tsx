@@ -48,6 +48,7 @@ import { CountSessionsPage } from '@/features/counting/count-sessions-page'
 import { CountSessionPage } from '@/features/counting/count-session-page'
 import { PrintQueuePage } from '@/features/print/print-queue-page'
 import { MarketplacePage } from '@/features/network/marketplace-page'
+import { MarketplaceHomePage } from '@/features/network/marketplace-home-page'
 import { SupplierProfilePage } from '@/features/network/supplier-profile-page'
 import { MyStorefrontPage } from '@/features/network/my-storefront-page'
 import { ConnectionsPage } from '@/features/network/connections-page'
@@ -138,7 +139,10 @@ export function AppRouter() {
 
             {/* The public plane. Discovery is open to anyone who can see
                 purchasing; publishing and connecting are owner/manager. */}
-            <Route path="/network" element={<MarketplacePage />} />
+            {/* Home is the workspace entry point; the grid moved to /search.
+                They were two jobs in one screen and the grid always won. */}
+            <Route path="/network" element={<MarketplaceHomePage />} />
+            <Route path="/network/search" element={<MarketplacePage />} />
             <Route path="/network/suppliers/:id" element={<SupplierProfilePage />} />
             <Route path="/network/listings/:id" element={<ListingDetailPage />} />
             <Route element={<RequireRole roles={[...MANAGE_ROLES]} />}>

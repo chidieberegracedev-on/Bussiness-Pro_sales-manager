@@ -22,7 +22,7 @@ export function FindSuppliersLink({
 
   return (
     <Link
-      to={`/network?product=${canonical.id}`}
+      to={`/network/search?product=${canonical.id}`}
       className={className}
       title={`Find suppliers offering ${canonical.name}`}
     >

@@ -187,7 +187,7 @@ export function ConnectionsPage() {
               description="Find suppliers on the network and send a request. They choose whether to accept."
               action={
                 <Button asChild>
-                  <Link to="/network">Browse the network</Link>
+                  <Link to="/network/search">Browse the network</Link>
                 </Button>
               }
             />
