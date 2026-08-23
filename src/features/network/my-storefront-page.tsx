@@ -8,6 +8,8 @@ import {
   ShieldCheck,
   Info,
   Eye,
+  ImagePlus,
+  X,
   Link2,
   Lock,
   Package,
@@ -21,6 +23,7 @@ import { PageHeader } from '@/components/layout/page-header'
 import {
   useMySupplierProfile,
   useMyListings,
+  useUploadStorefrontLogo,
   useIncomingConnections,
   usePublishSupplierProfile,
   useUpdateSupplierProfile,
@@ -37,6 +40,7 @@ import type { TrustTier } from '@/types/database'
 import { useActiveBusiness } from '@/features/business/hooks'
 import { toast } from '@/hooks/use-toast'
 import { toReadableError } from '@/lib/errors'
+import { toUploadErrorMessage } from '@/lib/image-upload'
 
 /**
  * Becoming a public supplier — a deliberate act, but not a waiting room.
@@ -55,6 +59,7 @@ export function MyStorefrontPage() {
   const { data: listings } = useMyListings()
   const { data: incoming } = useIncomingConnections()
   const publish = usePublishSupplierProfile()
+  const uploadLogo = useUploadStorefrontLogo()
   const update = useUpdateSupplierProfile()
 
   const canManage = role === 'owner' || role === 'manager'
@@ -65,6 +70,8 @@ export function MyStorefrontPage() {
   const [phone, setPhone] = useState('')
   const [email, setEmail] = useState('')
   const [minOrderNote, setMinOrderNote] = useState('')
+  const [deliveryAreas, setDeliveryAreas] = useState<string[]>([])
+  const [areaDraft, setAreaDraft] = useState('')
 
   // Radix-free plain inputs, so a straight effect is enough to seed them once
   // the profile arrives.
@@ -79,7 +86,20 @@ export function MyStorefrontPage() {
     setPhone(profile.contact_phone ?? '')
     setEmail(profile.contact_email ?? '')
     setMinOrderNote(profile.min_order_note ?? '')
+    setDeliveryAreas((profile.delivery_areas ?? []).filter(Boolean))
   }, [profile, business?.name])
+
+  function addArea() {
+    const area = areaDraft.trim()
+    // Case-insensitive dedupe: "Lagos" and "lagos" as two chips would look
+    // like a bug to the buyer reading them.
+    if (!area || deliveryAreas.some((a) => a.toLowerCase() === area.toLowerCase())) {
+      setAreaDraft('')
+      return
+    }
+    setDeliveryAreas([...deliveryAreas, area])
+    setAreaDraft('')
+  }
 
   async function handlePublish(e: FormEvent) {
     e.preventDefault()
@@ -113,8 +133,9 @@ export function MyStorefrontPage() {
         contact_phone: phone.trim() || null,
         contact_email: email.trim() || null,
         min_order_note: minOrderNote.trim() || null,
+        delivery_areas: deliveryAreas.length > 0 ? deliveryAreas : null,
       })
-      toast({ title: 'Contact details saved' })
+      toast({ title: 'Storefront saved' })
     } catch (error) {
       toast({
         variant: 'destructive',
@@ -343,6 +364,63 @@ export function MyStorefrontPage() {
           </CardDescription>
         </CardHeader>
         <CardContent>
+          {/* Appearance first — the logo and the name are what a buyer sees
+              before they read anything, and until now neither the logo nor the
+              delivery areas could be set at all: both columns were rendered on
+              the public storefront with no way to fill them in. */}
+          {profile && (
+            <div className="mb-5 flex flex-wrap items-center gap-4 rounded-xl bg-background p-4">
+              <span className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-tint-accent text-lg font-bold text-tint-accent-foreground">
+                {profile.logo_url ? (
+                  <img src={profile.logo_url} alt="" className="size-full object-cover" />
+                ) : (
+                  (profile.display_name[0] ?? '?').toUpperCase()
+                )}
+              </span>
+              <div className="min-w-0 flex-1">
+                <p className="type-heading">Storefront logo</p>
+                <p className="type-meta mt-0.5">
+                  Shown next to your name everywhere on the network. Published — anyone with the
+                  link can see it.
+                </p>
+              </div>
+              <label
+                className={`inline-flex shrink-0 cursor-pointer items-center gap-2 rounded-lg border border-border-strong bg-surface px-4 py-2.5 text-sm font-semibold text-text-primary transition-colors hover:bg-surface-muted ${
+                  uploadLogo.isPending ? 'pointer-events-none opacity-60' : ''
+                }`}
+              >
+                {uploadLogo.isPending ? (
+                  <Loader2 className="size-4 animate-spin" />
+                ) : (
+                  <ImagePlus className="size-4" />
+                )}
+                {profile.logo_url ? 'Replace' : 'Upload'}
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="sr-only"
+                  disabled={!canManage || uploadLogo.isPending}
+                  onChange={(event) => {
+                    const file = event.target.files?.[0]
+                    event.target.value = ''
+                    if (!file) return
+                    uploadLogo.mutate(
+                      { profileId: profile.id, file },
+                      {
+                        onError: (error) =>
+                          toast({
+                            variant: 'destructive',
+                            title: "Couldn't upload that",
+                            description: toUploadErrorMessage(error),
+                          }),
+                      },
+                    )
+                  }}
+                />
+              </label>
+            </div>
+          )}
+
           <form onSubmit={handlePublish} className="space-y-4">
             <div>
               <label className="text-sm font-medium text-text-secondary" htmlFor="sf-name">
@@ -454,9 +532,66 @@ export function MyStorefrontPage() {
                 disabled={!canManage}
               />
             </div>
+            {/* Delivery areas are a text[] the public storefront already
+                renders as chips — this is the only place they can be set. */}
+            <div>
+              <span className="text-sm font-medium text-text-secondary">Delivery areas</span>
+              <p className="type-meta mt-0.5">
+                Where you'll deliver. Buyers filter and judge distance on these.
+              </p>
+
+              {deliveryAreas.length > 0 && (
+                <div className="mt-2 flex flex-wrap gap-2">
+                  {deliveryAreas.map((area) => (
+                    <span
+                      key={area}
+                      className="inline-flex items-center gap-1.5 rounded-full bg-tint-accent py-1.5 pl-3 pr-1.5 text-[0.8125rem] font-medium text-tint-accent-foreground"
+                    >
+                      {area}
+                      {canManage && (
+                        <button
+                          type="button"
+                          aria-label={`Remove ${area}`}
+                          onClick={() => setDeliveryAreas(deliveryAreas.filter((a) => a !== area))}
+                          className="flex size-5 items-center justify-center rounded-full transition-colors hover:bg-surface"
+                        >
+                          <X className="size-3" />
+                        </button>
+                      )}
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div className="mt-2 flex gap-2">
+                <Input
+                  value={areaDraft}
+                  onChange={(e) => setAreaDraft(e.target.value)}
+                  placeholder="Add an area and press Enter"
+                  aria-label="Add a delivery area"
+                  disabled={!canManage}
+                  onKeyDown={(e) => {
+                    if (e.key !== 'Enter') return
+                    // Inside a card, not a form — but Enter in a text input
+                    // still submits an enclosing form in some browsers.
+                    e.preventDefault()
+                    addArea()
+                  }}
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={addArea}
+                  disabled={!canManage || !areaDraft.trim()}
+                >
+                  Add
+                </Button>
+              </div>
+            </div>
+
             <Button variant="outline" onClick={saveContact} disabled={!canManage || update.isPending}>
               {update.isPending && <Loader2 className="size-4 animate-spin" />}
-              Save contact details
+              Save contact &amp; delivery
             </Button>
           </CardContent>
         </Card>

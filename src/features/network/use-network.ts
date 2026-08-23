@@ -266,6 +266,44 @@ export function usePublishSupplierProfile() {
   })
 }
 
+/**
+ * The storefront logo.
+ *
+ * Goes to the PUBLIC network-images bucket and stores the resulting public URL
+ * on the profile, because `supplier_profiles.logo_url` is a URL column read by
+ * every other business on the network — a signed URL would expire, and a
+ * private-bucket path would render as a broken image to everyone but the owner.
+ */
+export function useUploadStorefrontLogo() {
+  const { business } = useActiveBusiness()
+  const qc = useQueryClient()
+
+  return useMutation({
+    mutationFn: async (input: { profileId: string; file: File }) => {
+      const path = await uploadBusinessScopedImage(
+        NETWORK_IMAGE_BUCKET,
+        business!.id,
+        input.file,
+        { kind: 'network-listing' },
+      )
+      const url = networkImageUrl(path)
+      const { error } = await supabase
+        .from('supplier_profiles')
+        .update({ logo_url: url ?? null })
+        .eq('id', input.profileId)
+      if (error) {
+        console.error('[supplier_profiles.logo] failed', error)
+        throw error
+      }
+      return url
+    },
+    onSuccess: (_d, input) => {
+      qc.invalidateQueries({ queryKey: ['my-supplier-profile', business?.id] })
+      qc.invalidateQueries({ queryKey: ['supplier-profile', input.profileId] })
+    },
+  })
+}
+
 /** Contact details and the rest of the storefront, edited directly. */
 export function useUpdateSupplierProfile() {
   const { business } = useActiveBusiness()
@@ -891,6 +929,42 @@ export function useListingTiers(listingId: string | undefined) {
       )
     },
     enabled: !!listingId,
+  })
+}
+
+/**
+ * Price tiers for many listings at once, keyed by listing.
+ *
+ * A product page shows five suppliers, each with a price ladder. Fetching per
+ * row would be five round trips that all arrive at different times, so the
+ * ladders would pop in one by one and the page would reflow under the reader.
+ */
+export function useListingTiersFor(listingIds: string[]) {
+  const key = [...listingIds].sort().join(',')
+
+  return useQuery({
+    queryKey: ['listing-tiers-batch', key],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('listing_price_tiers')
+        .select('*')
+        .in('listing_id', listingIds)
+      if (error) {
+        console.error('[listing_price_tiers batch] failed', error)
+        throw error
+      }
+      const map = new Map<string, PriceTier[]>()
+      for (const row of (data ?? []) as PriceTier[]) {
+        const list = map.get(row.listing_id) ?? []
+        list.push(row)
+        map.set(row.listing_id, list)
+      }
+      for (const list of map.values()) {
+        list.sort((a, b) => new Decimal(a.min_qty).comparedTo(new Decimal(b.min_qty)))
+      }
+      return map
+    },
+    enabled: listingIds.length > 0,
   })
 }
 

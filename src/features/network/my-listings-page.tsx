@@ -9,15 +9,16 @@ import {
   ImagePlus,
   Loader2,
   Store,
+  Inbox,
   Search,
   Tag,
-  Info,
   X,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
+import { IconBadge, NotePanel } from '@/components/ui/icon-badge'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { MoneyInput } from '@/components/money/money-input'
@@ -28,6 +29,8 @@ import { Skeleton } from '@/components/ui/skeleton'
 import {
   useMySupplierProfile,
   useMyListings,
+  useIncomingConnections,
+  useUnreadMessageCount,
   useCreateListing,
   useUpdateListing,
   useDeleteListing,
@@ -67,6 +70,8 @@ export function MyListingsPage() {
   const { role } = useActiveBusiness()
   const { data: profile, isLoading: profileLoading } = useMySupplierProfile()
   const { data: listings, isLoading } = useMyListings()
+  const { data: incoming } = useIncomingConnections()
+  const unreadMessages = useUnreadMessageCount()
   const [addOpen, setAddOpen] = useState(false)
 
   const canManage = role === 'owner' || role === 'manager'
@@ -100,29 +105,47 @@ export function MyListingsPage() {
     )
   }
 
+  const active = (listings ?? []).filter((l) => l.availability === 'active')
+  const inactive = (listings ?? []).filter((l) => l.availability !== 'active')
+  const pendingRequests = (incoming ?? []).filter((c) => c.status === 'requested')
+
   return (
-    <div>
+    <div className="mx-auto max-w-5xl">
       <PageHeader
-        title="What you sell"
-        description="The products other businesses can buy from you, and what you charge at each quantity."
+        eyebrow="Supplier Network"
+        title="My listings"
+        description={`Viewing the network as a seller: ${profile.display_name}`}
         actions={
           canManage ? (
-            <Button onClick={() => setAddOpen(true)}>
-              <Plus className="size-4" /> List a product
-            </Button>
+            <>
+              <Button variant="outline" asChild>
+                <Link to="/network/my-profile">
+                  <Store className="size-4" /> Storefront settings
+                </Link>
+              </Button>
+              <Button onClick={() => setAddOpen(true)}>
+                <Plus className="size-4" /> Add listing
+              </Button>
+            </>
           ) : undefined
         }
       />
 
-      <div className="mb-4 flex items-start gap-2.5 rounded-lg border border-info/30 bg-info/5 p-3">
-        <Info className="mt-0.5 size-4 shrink-0 text-info" />
-        <p className="text-sm text-text-secondary">
-          Buyers see the product, your price breaks, and your minimum order — nothing about what you
-          paid, what you hold, or who else buys from you.
-        </p>
-      </div>
+      {/* Visibility, stated where a seller is actually working — the storefront
+          page owns the switch, but someone editing listings needs to know
+          whether anyone can see them. */}
+      {!profile.is_public && (
+        <NotePanel tone="warning" className="mb-5 flex flex-wrap items-center gap-3">
+          <span className="min-w-0 flex-1 text-sm font-medium">
+            Your storefront is hidden, so none of these listings are findable.
+          </span>
+          <Button variant="outline" size="sm" className="bg-surface" asChild>
+            <Link to="/network/my-profile">Change visibility</Link>
+          </Button>
+        </NotePanel>
+      )}
 
-      {isLoading && <Skeleton className="h-48 w-full rounded-xl" />}
+      {isLoading && <Skeleton className="h-48 w-full rounded-2xl" />}
 
       {!isLoading && (listings ?? []).length === 0 && (
         <EmptyState
@@ -132,22 +155,99 @@ export function MyListingsPage() {
           action={
             canManage ? (
               <Button onClick={() => setAddOpen(true)}>
-                <Plus className="size-4" /> List a product
+                <Plus className="size-4" /> Add listing
               </Button>
             ) : undefined
           }
         />
       )}
 
-      {!isLoading && (listings ?? []).length > 0 && (
-        <div className="space-y-3">
-          {(listings ?? []).map((listing) => (
-            <ListingRow key={listing.id} listing={listing} canManage={canManage} />
-          ))}
-        </div>
+      {!isLoading && active.length > 0 && (
+        <section className="mb-8">
+          <h2 className="type-title mb-3">Active listings</h2>
+          <div className="space-y-3">
+            {active.map((listing) => (
+              <ListingRow key={listing.id} listing={listing} canManage={canManage} />
+            ))}
+          </div>
+        </section>
       )}
 
+      {!isLoading && inactive.length > 0 && (
+        <section className="mb-8">
+          <h2 className="type-title mb-1">Not for sale</h2>
+          <p className="type-meta mb-3">
+            Hidden or out of stock. Buyers can't find these.
+          </p>
+          <div className="space-y-3">
+            {inactive.map((listing) => (
+              <ListingRow key={listing.id} listing={listing} canManage={canManage} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      {/* Incoming interest — the seller's inbox, on the seller's screen. */}
+      <section className="mb-8">
+        <h2 className="type-title mb-1">Incoming requests</h2>
+        <p className="type-meta mb-3">Businesses asking to buy from you.</p>
+
+        {pendingRequests.length === 0 && unreadMessages === 0 ? (
+          <div className="rounded-2xl bg-card p-6 text-center shadow-e2">
+            <p className="type-body">
+              Nothing waiting. Connection requests and buyer questions land here.
+            </p>
+          </div>
+        ) : (
+          <div className="space-y-3">
+            {pendingRequests.length > 0 && (
+              <SellerAlert
+                title={`${pendingRequests.length} connection request${pendingRequests.length === 1 ? '' : 's'}`}
+                body="A business wants to buy from you. Accepting adds them to your Suppliers list on their side."
+                to="/network/connections"
+                cta="Review"
+              />
+            )}
+            {unreadMessages > 0 && (
+              <SellerAlert
+                title={`${unreadMessages} unanswered message${unreadMessages === 1 ? '' : 's'}`}
+                body="Response time is one of the trust facts buyers see on your storefront."
+                to="/network/messages"
+                cta="Reply"
+              />
+            )}
+          </div>
+        )}
+      </section>
+
       {addOpen && <AddListingDialog onClose={() => setAddOpen(false)} />}
+    </div>
+  )
+}
+
+function SellerAlert({
+  title,
+  body,
+  to,
+  cta,
+}: {
+  title: string
+  body: string
+  to: string
+  cta: string
+}) {
+  return (
+    <div className="flex flex-wrap items-center gap-4 rounded-2xl bg-card p-4 shadow-e2">
+      <IconBadge tone="accent" size="lg">
+        <Inbox />
+      </IconBadge>
+      <div className="min-w-0 flex-1">
+        <p className="type-heading">{title}</p>
+        <p className="type-meta mt-0.5">{body}</p>
+      </div>
+      <Button variant="outline" asChild className="shrink-0">
+        <Link to={to}>{cta}</Link>
+      </Button>
     </div>
   )
 }

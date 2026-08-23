@@ -1,22 +1,20 @@
-import { useState } from 'react'
+import { useMemo, useState } from 'react'
 import { Link, useNavigate, useParams } from 'react-router-dom'
 import Decimal from 'decimal.js'
 import {
   ArrowLeft,
-  Store,
-  MapPin,
-  Package,
-  Link2,
+  BadgeCheck,
   Check,
+  Link2,
   Loader2,
-  Phone,
-  Mail,
-  Truck,
   MessageSquare,
+  Package,
+  Store,
 } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import { Money } from '@/components/money/money'
+import { Badge } from '@/components/ui/badge'
 import { Skeleton } from '@/components/ui/skeleton'
+import { Money } from '@/components/money/money'
 import { ErrorState } from '@/components/data/error-state'
 import {
   useSupplierProfile,
@@ -28,29 +26,33 @@ import {
   type ListingWithTiers,
 } from '@/features/network/use-network'
 import { MessageSupplierDialog } from '@/features/network/message-supplier-dialog'
-import {
-  VerificationBadge,
-  TrustTierBadge,
-  TrustIndicators,
-  TIER_MEANING,
-  normaliseTier,
-} from '@/features/network/trust-indicators'
+import { TrustTierBadge, VerificationBadge, TIER_MEANING, normaliseTier } from '@/features/network/trust-indicators'
 import { BuyerProtectionNotice } from '@/features/network/buyer-protection'
+import { formatMinutes, tierLabel } from '@/features/network/supplier-offer-row'
 import { useActiveBusiness } from '@/features/business/hooks'
+import { useLocale } from '@/features/auth/use-locale'
+import { formatDate } from '@/lib/format'
 import { toast } from '@/hooks/use-toast'
 import { toReadableError } from '@/lib/errors'
 
 /**
  * A supplier's public storefront.
  *
- * Everything shown here is data the supplier chose to publish. There is no
- * path from this screen to anything private — not theirs, not ours.
+ * Everything here is data the supplier chose to publish. There is no path from
+ * this screen to anything private — not theirs, not ours.
+ *
+ * Layout follows the reference: identity and the primary action at the top,
+ * then a two-column body — what they say about themselves and what they sell
+ * on the left, the evidence for trusting them on the right. Trust sits in its
+ * own column because it is what a buyer scans while reading everything else.
  */
 export function SupplierProfilePage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
+  const locale = useLocale()
   const { business, role } = useActiveBusiness()
   const canMessage = role === 'owner' || role === 'manager'
+
   const { data: profile, isLoading, isError } = useSupplierProfile(id)
   const { data: listings, isLoading: listingsLoading } = useSupplierListings(id)
   const statusMap = useConnectionStatusMap()
@@ -62,22 +64,23 @@ export function SupplierProfilePage() {
   const isMine = !!profile && profile.business_id === business?.id
   const existing = id ? statusMap.get(id) : undefined
 
+  const deliveryAreas = useMemo(
+    () => (profile?.delivery_areas ?? []).filter(Boolean),
+    [profile],
+  )
+
   if (isLoading) {
     return (
-      <div className="space-y-4">
+      <div className="mx-auto max-w-5xl space-y-4">
         <Skeleton className="h-9 w-40" />
-        <Skeleton className="h-40 w-full rounded-xl" />
-        <Skeleton className="h-64 w-full rounded-xl" />
+        <Skeleton className="h-28 w-full rounded-2xl" />
+        <Skeleton className="h-64 w-full rounded-2xl" />
       </div>
     )
   }
+
   if (isError || !profile) {
-    return (
-      <ErrorState
-        error={new Error('Supplier not found')}
-        onRetry={() => navigate('/network')}
-      />
-    )
+    return <ErrorState error={new Error('Supplier not found')} onRetry={() => navigate('/network/search')} />
   }
 
   function connect() {
@@ -86,7 +89,7 @@ export function SupplierProfilePage() {
       onSuccess: () =>
         toast({
           title: 'Request sent',
-          description: 'They can accept it from their end, and then they appear in your Suppliers.',
+          description: 'They can accept it, and then they appear in your Suppliers.',
         }),
       onError: (e) =>
         toast({
@@ -97,137 +100,213 @@ export function SupplierProfilePage() {
     })
   }
 
+  const initials = profile.display_name
+    .split(/\s+/)
+    .slice(0, 2)
+    .map((w) => w[0]?.toUpperCase())
+    .join('')
+
   return (
-    <div>
-      <Button variant="ghost" size="sm" className="mb-3" onClick={() => navigate('/network')}>
-        <ArrowLeft className="size-4" /> Network
+    <div className="mx-auto max-w-5xl">
+      <Button variant="ghost" size="sm" className="mb-3" onClick={() => navigate(-1)}>
+        <ArrowLeft className="size-4" /> Back
       </Button>
 
-      {/* The storefront header is the identity block, so it gets the one
-          tinted surface on the page — the store mark sits in a circular badge
-          on white, and the trust facts as pills on top of the tint. */}
-      <div className="mb-4 rounded-2xl bg-tint-accent p-5 sm:p-6">
-        <div className="flex flex-wrap items-start gap-4">
-          <span className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-full bg-surface shadow-e1">
-            {profile.logo_url ? (
-              <img src={profile.logo_url} alt="" className="size-full object-cover" />
-            ) : (
-              <Store className="size-7 text-tint-accent-foreground" />
-            )}
-          </span>
+      {/* Identity + the one primary action */}
+      <div className="flex flex-wrap items-start gap-4 rounded-2xl bg-card p-5 shadow-e2">
+        <span className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-full bg-tint-accent text-base font-bold text-tint-accent-foreground">
+          {profile.logo_url ? (
+            <img src={profile.logo_url} alt="" className="size-full object-cover" />
+          ) : (
+            initials || <Store className="size-6" aria-hidden="true" />
+          )}
+        </span>
 
-          <div className="min-w-0 flex-1">
-            <div className="flex flex-wrap items-center gap-2">
-              <h1 className="truncate text-2xl font-bold tracking-tight text-text-primary">
-                {profile.display_name}
-              </h1>
-              <TrustTierBadge tier={profile.trust_tier} className="bg-surface/80" />
-              {profile.verification === 'verified' && (
-                <VerificationBadge verification={profile.verification} />
-              )}
-            </div>
-            <p className="mt-1.5 text-xs text-tint-accent-foreground">
-              {TIER_MEANING[normaliseTier(profile.trust_tier)]}
-            </p>
-            {profile.location_text && (
-              <p className="mt-1 flex items-center gap-1.5 text-sm font-medium text-text-secondary">
-                <MapPin className="size-3.5 text-tint-accent-foreground" /> {profile.location_text}
-              </p>
-            )}
-            {profile.description && (
-              <p className="mt-2 max-w-prose text-sm text-text-secondary">{profile.description}</p>
-            )}
-            <TrustIndicators facts={profile} className="mt-3.5" />
-          </div>
-
-          <div className="flex shrink-0 flex-col gap-2">
-            {isMine ? (
-              <Button variant="outline" className="bg-surface" onClick={() => navigate('/network/my-profile')}>
-                Edit storefront
-              </Button>
-            ) : existing?.status === 'accepted' ? (
-              <Button variant="outline" className="bg-surface" disabled>
-                <Check className="size-4" /> Connected
-              </Button>
-            ) : existing?.status === 'requested' ? (
-              <Button variant="outline" className="bg-surface" disabled>
-                <Loader2 className="size-4" /> Request sent
-              </Button>
-            ) : (
-              <Button onClick={connect} disabled={request.isPending}>
-                <Link2 className="size-4" /> Connect
-              </Button>
-            )}
-            {/* Messaging lives behind the owner/manager guard, so offering it
-                to a cashier would send them to a route that bounces them. */}
-            {!isMine && id && canMessage && (
-              existingThread ? (
-                <Button variant="outline" className="bg-surface" asChild>
-                  <Link to={`/network/messages/${existingThread.id}`}>
-                    <MessageSquare className="size-4" /> Open conversation
-                  </Link>
-                </Button>
-              ) : (
-                <Button
-                  variant="outline"
-                  className="bg-surface"
-                  onClick={() => setMessageOpen(true)}
-                >
-                  <MessageSquare className="size-4" /> Message
-                </Button>
-              )
+        <div className="min-w-0 flex-1">
+          <div className="flex flex-wrap items-center gap-2">
+            <h1 className="type-title text-2xl">{profile.display_name}</h1>
+            <TrustTierBadge tier={profile.trust_tier} />
+            {profile.verification === 'verified' && (
+              <VerificationBadge verification={profile.verification} />
             )}
           </div>
-        </div>
-
-        {(profile.contact_phone || profile.contact_email || profile.min_order_note) && (
-          <div className="mt-4 flex flex-wrap gap-2 border-t border-tint-accent-foreground/15 pt-4 text-sm">
-            {profile.contact_phone && (
-              <ContactChip icon={Phone}>{profile.contact_phone}</ContactChip>
-            )}
-            {profile.contact_email && (
-              <ContactChip icon={Mail}>{profile.contact_email}</ContactChip>
-            )}
-            {profile.min_order_note && (
-              <ContactChip icon={Truck}>{profile.min_order_note}</ContactChip>
-            )}
-          </div>
-        )}
-      </div>
-
-      <BuyerProtectionNotice className="mb-4" />
-
-      <h2 className="mb-3 text-base font-semibold text-text-primary">
-        What they sell{listings && listings.length > 0 && ` (${listings.length})`}
-      </h2>
-
-      {listingsLoading && <Skeleton className="h-48 w-full rounded-xl" />}
-
-      {!listingsLoading && (listings ?? []).length === 0 && (
-        <div className="rounded-xl border border-dashed border-border p-8 text-center">
-          <Package className="mx-auto size-8 text-text-muted" />
-          <p className="mt-2 text-sm font-medium text-text-primary">Nothing listed yet</p>
-          <p className="mt-1 text-sm text-text-secondary">
-            This supplier hasn't published any products.
+          <p className="type-meta mt-1">
+            {[
+              profile.location_text,
+              `Member since ${formatDate(profile.created_at, business?.timezone ?? 'UTC', locale)}`,
+            ]
+              .filter(Boolean)
+              .join(' · ')}
+          </p>
+          <p className="type-meta mt-1 max-w-prose">
+            {TIER_MEANING[normaliseTier(profile.trust_tier)]}
           </p>
         </div>
-      )}
 
-      {!listingsLoading && (listings ?? []).length > 0 && (
-        <div className="grid auto-rows-fr grid-cols-1 gap-3 md:grid-cols-2">
-          {(listings ?? []).map((listing) => (
-            <ListingCard
-              key={listing.id}
-              listing={listing}
-              // The supplier's own photo beats the shared catalog picture:
-              // it's what will actually arrive.
-              imageUrl={imageMap?.get(listing.id) ?? listing.product?.image_url ?? undefined}
-            />
-          ))}
+        <div className="flex shrink-0 flex-wrap gap-2">
+          {isMine ? (
+            <Button variant="outline" asChild>
+              <Link to="/network/my-profile">Edit storefront</Link>
+            </Button>
+          ) : (
+            <>
+              {existing?.status === 'accepted' ? (
+                <Button variant="outline" disabled>
+                  <Check className="size-4" /> Connected
+                </Button>
+              ) : existing?.status === 'requested' ? (
+                <Button variant="outline" disabled>
+                  <Loader2 className="size-4" /> Request sent
+                </Button>
+              ) : (
+                <Button onClick={connect} disabled={request.isPending}>
+                  <Link2 className="size-4" /> Connect
+                </Button>
+              )}
+              {canMessage &&
+                id &&
+                (existingThread ? (
+                  <Button variant="outline" asChild>
+                    <Link to={`/network/messages/${existingThread.id}`}>
+                      <MessageSquare className="size-4" /> Open conversation
+                    </Link>
+                  </Button>
+                ) : (
+                  <Button variant="outline" onClick={() => setMessageOpen(true)}>
+                    <MessageSquare className="size-4" /> Contact
+                  </Button>
+                ))}
+            </>
+          )}
         </div>
-      )}
+      </div>
 
-      {messageOpen && profile && id && (
+      <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,2fr)_minmax(0,1fr)]">
+        {/* Left: what they say, where they deliver, what they sell */}
+        <div className="min-w-0 space-y-4">
+          <section className="rounded-2xl bg-card p-5 shadow-e2">
+            <h2 className="type-heading">About</h2>
+            {profile.description ? (
+              <p className="type-body mt-1.5 max-w-prose">{profile.description}</p>
+            ) : (
+              <p className="type-meta mt-1.5">
+                This supplier hasn't written a description yet.
+              </p>
+            )}
+
+            <dl className="mt-4 grid grid-cols-2 gap-4 sm:grid-cols-3">
+              <Stat
+                label="Typical response"
+                value={
+                  profile.avg_response_minutes != null
+                    ? formatMinutes(profile.avg_response_minutes)
+                    : 'No data yet'
+                }
+              />
+              <Stat label="Completed orders" value={String(profile.completed_orders)} />
+              <Stat
+                label="Products listed"
+                value={String((listings ?? []).filter((l) => l.availability === 'active').length)}
+              />
+            </dl>
+          </section>
+
+          {deliveryAreas.length > 0 && (
+            <section className="rounded-2xl bg-card p-5 shadow-e2">
+              <h2 className="type-heading">Delivery areas</h2>
+              <div className="mt-2.5 flex flex-wrap gap-2">
+                {deliveryAreas.map((area) => (
+                  <span
+                    key={area}
+                    className="rounded-full bg-background px-3 py-1.5 text-[0.8125rem] font-medium text-text-secondary"
+                  >
+                    {area}
+                  </span>
+                ))}
+              </div>
+              {profile.min_order_note && (
+                <p className="type-meta mt-3">{profile.min_order_note}</p>
+              )}
+            </section>
+          )}
+
+          <section className="rounded-2xl bg-card p-5 shadow-e2">
+            <h2 className="type-heading">
+              Products supplied
+              {(listings ?? []).length > 0 && (
+                <span className="ml-1.5 font-normal text-text-muted">({listings?.length})</span>
+              )}
+            </h2>
+
+            {listingsLoading && <Skeleton className="mt-3 h-28 w-full rounded-xl" />}
+
+            {!listingsLoading && (listings ?? []).length === 0 && (
+              <p className="type-meta mt-2">This supplier hasn't published any products yet.</p>
+            )}
+
+            <div className="mt-3 space-y-3">
+              {(listings ?? []).map((listing) => (
+                <ProductSuppliedRow
+                  key={listing.id}
+                  listing={listing}
+                  imageUrl={imageMap?.get(listing.id) ?? listing.product?.image_url ?? undefined}
+                />
+              ))}
+            </div>
+          </section>
+        </div>
+
+        {/* Right: the evidence column */}
+        <aside className="min-w-0 space-y-4">
+          <section className="rounded-2xl bg-card p-5 shadow-e2">
+            <h2 className="type-heading">Supplier trust</h2>
+            <ul className="mt-3 space-y-2">
+              <TrustLine
+                met={profile.verification === 'verified'}
+                label="Business identity verified"
+                pending="Verification pending"
+              />
+              <TrustLine met={!!profile.contact_phone} label="Phone provided" pending="No phone published" />
+              <TrustLine
+                met={!!profile.location_text}
+                label="Location published"
+                pending="No location published"
+              />
+              <TrustLine
+                met={profile.completed_orders > 0}
+                label={`${profile.completed_orders} completed marketplace order${profile.completed_orders === 1 ? '' : 's'}`}
+                pending="No completed orders yet"
+              />
+              <TrustLine
+                met={profile.fulfillment_rate != null}
+                label={
+                  profile.fulfillment_rate != null
+                    ? `${Number(profile.fulfillment_rate).toFixed(0)}% successful delivery rate`
+                    : ''
+                }
+                pending="No delivery history yet"
+              />
+              <TrustLine
+                met={profile.repeat_customers > 0}
+                label={`${profile.repeat_customers} repeat buyer${profile.repeat_customers === 1 ? '' : 's'}`}
+                pending="No repeat buyers yet"
+              />
+            </ul>
+
+            {/* No composite score. Inventing "4.6 / 5" before there are orders
+                behind it looks authoritative, can't be argued with, and a buyer
+                would spend money on it. */}
+            <p className="type-meta mt-3.5">
+              Shown as separate facts on purpose — there is no single rating until the network has
+              real trading behind it.
+            </p>
+          </section>
+
+          <BuyerProtectionNotice />
+        </aside>
+      </div>
+
+      {messageOpen && id && (
         <MessageSupplierDialog
           supplierProfileId={id}
           supplierName={profile.display_name}
@@ -238,13 +317,36 @@ export function SupplierProfilePage() {
   )
 }
 
+function Stat({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <dt className="type-meta truncate">{label}</dt>
+      <dd className="mt-0.5 truncate text-[0.9375rem] font-semibold text-text-primary">{value}</dd>
+    </div>
+  )
+}
+
 /**
- * A listing with its wholesale price breaks.
- *
- * The tiers are the point: "cheaper if you buy more" is how wholesale actually
- * works, and a single price hides the decision a buyer is trying to make.
+ * A trust fact, shown whether or not it is met. Hiding the unmet ones would
+ * make every new supplier look identical to a proven one with a shorter list.
  */
-function ListingCard({
+function TrustLine({ met, label, pending }: { met: boolean; label: string; pending: string }) {
+  return (
+    <li className="flex items-start gap-2 text-[0.8125rem]">
+      {met ? (
+        <BadgeCheck className="mt-px size-4 shrink-0 text-success" aria-hidden="true" />
+      ) : (
+        <span
+          aria-hidden="true"
+          className="mt-1.5 size-1.5 shrink-0 rounded-full bg-text-disabled"
+        />
+      )}
+      <span className={met ? 'text-text-primary' : 'text-text-muted'}>{met ? label : pending}</span>
+    </li>
+  )
+}
+
+function ProductSuppliedRow({
   listing,
   imageUrl,
 }: {
@@ -254,85 +356,52 @@ function ListingCard({
   return (
     <Link
       to={`/network/listings/${listing.id}`}
-      className="flex h-full min-w-0 flex-col rounded-2xl bg-card p-3 shadow-e2 transition-shadow hover:shadow-e3"
+      className="flex min-w-0 gap-3 rounded-xl bg-background p-3 transition-colors hover:bg-surface-muted"
     >
-      <div className="flex min-w-0 items-start gap-3">
-        {/* The image well is the focal shape — larger radius than the card's
-            inner controls, on a tint rather than another gray square. */}
-        <span className="flex size-16 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-tint-accent/60">
-          {imageUrl ? (
-            <img src={imageUrl} alt="" className="size-full object-cover" loading="lazy" />
-          ) : (
-            <Package className="size-6 text-tint-accent-foreground/60" />
-          )}
-        </span>
-        <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-text-primary">
+      <span className="flex size-14 shrink-0 items-center justify-center overflow-hidden rounded-lg bg-tint-accent/60">
+        {imageUrl ? (
+          <img src={imageUrl} alt="" className="size-full object-cover" loading="lazy" />
+        ) : (
+          <Package className="size-5 text-tint-accent-foreground/60" aria-hidden="true" />
+        )}
+      </span>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex flex-wrap items-baseline justify-between gap-x-3">
+          <p className="type-heading truncate">
             {listing.supplier_product_name ?? listing.product?.name ?? 'Product'}
           </p>
-          <p className="truncate text-xs text-text-muted">
-            {listing.product?.brand ?? listing.product?.category ?? 'Uncategorised'}
-          </p>
-          <p className="mt-0.5 text-xs text-text-secondary">
-            Sold per {listing.purchase_unit}
-            {Number(listing.conversion_to_base) !== 1 && (
-              <> · 1 {listing.purchase_unit} = {new Decimal(listing.conversion_to_base).toString()}{' '}
-                {listing.product?.base_unit ?? 'unit'}</>
-            )}
+          <p className="type-meta shrink-0">
+            MOQ {new Decimal(listing.min_order_qty).toString()} {listing.purchase_unit}
           </p>
         </div>
+
+        {listing.availability !== 'active' && (
+          <Badge variant="warning" className="mt-1">
+            {listing.availability === 'out_of_stock' ? 'Out of stock' : 'Hidden'}
+          </Badge>
+        )}
+
+        {listing.tiers.length > 0 ? (
+          <ul className="mt-1.5 space-y-0.5">
+            {listing.tiers.map((tier) => (
+              <li
+                key={tier.id}
+                className="flex min-w-0 items-center justify-between gap-3 text-[0.8125rem]"
+              >
+                <span className="truncate text-text-muted">
+                  {tierLabel(tier.min_qty, tier.max_qty, listing.purchase_unit)}
+                </span>
+                <span className="shrink-0 font-bold tabular-nums text-text-primary">
+                  <Money value={tier.unit_price} />
+                </span>
+              </li>
+            ))}
+          </ul>
+        ) : (
+          <p className="type-meta mt-1.5">No published price — ask for a quote.</p>
+        )}
       </div>
-
-      {/* The price breaks are the reason a buyer is on this card, so they get
-          their own recessed surface rather than three more hairline rules. */}
-      {listing.tiers.length > 0 ? (
-        <ul className="mt-3 space-y-0.5 rounded-xl bg-background p-2">
-          {listing.tiers.map((tier) => (
-            <li
-              key={tier.id}
-              className="flex min-w-0 items-center justify-between gap-2 px-1 py-1 text-sm"
-            >
-              <span className="truncate text-text-secondary">
-                {tierLabel(tier.min_qty, tier.max_qty, listing.purchase_unit)}
-              </span>
-              <span className="shrink-0 font-bold tabular-nums text-accent-primary">
-                <Money value={tier.unit_price} />
-              </span>
-            </li>
-          ))}
-        </ul>
-      ) : (
-        <p className="mt-3 rounded-xl bg-background px-3 py-2 text-xs text-text-muted">
-          No published prices — ask for a quote.
-        </p>
-      )}
-
-      <p className="mt-auto px-1 pt-2.5 text-xs text-text-muted">
-        Minimum order {new Decimal(listing.min_order_qty).toString()} {listing.purchase_unit}
-        {listing.availability !== 'active' && ' · currently unavailable'}
-      </p>
     </Link>
   )
-}
-
-/** A contact fact, on its own white pill so it reads against the tinted header. */
-function ContactChip({
-  icon: Icon,
-  children,
-}: {
-  icon: React.ComponentType<{ className?: string }>
-  children: React.ReactNode
-}) {
-  return (
-    <span className="inline-flex min-w-0 items-center gap-1.5 rounded-full bg-surface px-3 py-1.5 text-sm text-text-secondary shadow-e1">
-      <Icon className="size-3.5 shrink-0 text-accent-primary" />
-      <span className="truncate">{children}</span>
-    </span>
-  )
-}
-
-function tierLabel(min: string, max: string | null, unit: string): string {
-  const from = new Decimal(min).toString()
-  if (!max) return `${from}+ ${unit}`
-  return `${from}–${new Decimal(max).toString()} ${unit}`
 }

@@ -49,6 +49,7 @@ import { CountSessionPage } from '@/features/counting/count-session-page'
 import { PrintQueuePage } from '@/features/print/print-queue-page'
 import { MarketplacePage } from '@/features/network/marketplace-page'
 import { MarketplaceHomePage } from '@/features/network/marketplace-home-page'
+import { NetworkProductPage } from '@/features/network/product-detail-page'
 import { SupplierProfilePage } from '@/features/network/supplier-profile-page'
 import { MyStorefrontPage } from '@/features/network/my-storefront-page'
 import { ConnectionsPage } from '@/features/network/connections-page'
@@ -143,6 +144,9 @@ export function AppRouter() {
                 They were two jobs in one screen and the grid always won. */}
             <Route path="/network" element={<MarketplaceHomePage />} />
             <Route path="/network/search" element={<MarketplacePage />} />
+            {/* A CANONICAL product and everyone who sells it — distinct from
+                /listings/:id, which is one supplier's offer of it. */}
+            <Route path="/network/products/:id" element={<NetworkProductPage />} />
             <Route path="/network/suppliers/:id" element={<SupplierProfilePage />} />
             <Route path="/network/listings/:id" element={<ListingDetailPage />} />
             <Route element={<RequireRole roles={[...MANAGE_ROLES]} />}>

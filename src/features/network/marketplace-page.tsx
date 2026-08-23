@@ -1,63 +1,55 @@
 import { useMemo, useState } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import Decimal from 'decimal.js'
-import {
-  Search,
-  Store,
-  Package,
-  ChevronDown,
-  Link2,
-  Loader2,
-  Check,
-  Globe,
-  ShieldCheck,
-  Inbox,
-  MessagesSquare,
-} from 'lucide-react'
+import { Globe, Search, SlidersHorizontal, Store } from 'lucide-react'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Money } from '@/components/money/money'
+import { Badge } from '@/components/ui/badge'
+import { Checkbox } from '@/components/ui/checkbox'
 import { Skeleton } from '@/components/ui/skeleton'
-import { IconBadge } from '@/components/ui/icon-badge'
+import { Money } from '@/components/money/money'
 import { PageHeader } from '@/components/layout/page-header'
 import { EmptyState } from '@/components/data/empty-state'
 import { ErrorState } from '@/components/data/error-state'
 import {
   useMarketplace,
   useMarketplaceCategories,
-  useRequestConnection,
+  useListingTiersFor,
   useConnectionStatusMap,
-  useMySupplierProfile,
-  useIncomingConnections,
-  useUnreadMessageCount,
   type MarketplaceProduct,
-  type MarketplaceRow,
 } from '@/features/network/use-network'
-import {
-  TrustTierBadge,
-  TrustIndicators,
-  TIER_LABELS,
-  normaliseTier,
-} from '@/features/network/trust-indicators'
+import { SupplierOfferRow } from '@/features/network/supplier-offer-row'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
-import { toast } from '@/hooks/use-toast'
-import { toReadableError } from '@/lib/errors'
 import { cn } from '@/lib/utils'
 
+type SortKey = 'best' | 'price' | 'moq' | 'orders'
+
+const SORT_LABELS: Record<SortKey, string> = {
+  best: 'Best match',
+  price: 'Lowest price',
+  moq: 'Lowest minimum order',
+  orders: 'Most orders completed',
+}
+
 /**
- * The trading floor.
+ * Product search — the buyer's working screen.
  *
- * One card per CANONICAL PRODUCT, expandable to the suppliers offering it —
- * not one card per listing. That distinction is the whole reason the canonical
- * catalog exists: four suppliers selling the same thing is one product to
- * not four products to scroll past.
+ * Results are SUPPLIER OFFERS, not products, because the question being asked
+ * is "who will sell me this and for how much". Products group those offers so
+ * one product sold by four suppliers is one heading with four rows underneath,
+ * not four unrelated cards to reconcile by hand.
  */
 export function MarketplacePage() {
   const [params, setParams] = useSearchParams()
   const [search, setSearch] = useState(params.get('q') ?? '')
-  // Seeded from the URL so a category chip on Home lands here already filtered,
-  // and so the filtered view is a shareable link rather than transient state.
   const [category, setCategory] = useState<string | 'all'>(params.get('category') ?? 'all')
+  const [verifiedOnly, setVerifiedOnly] = useState(false)
+  const [inStockOnly, setInStockOnly] = useState(false)
+  const [connectedOnly, setConnectedOnly] = useState(false)
+  const [maxMoq, setMaxMoq] = useState('')
+  const [sort, setSort] = useState<SortKey>('best')
+  const [filtersOpen, setFiltersOpen] = useState(false)
+
   const debounced = useDebouncedValue(search, 300)
   const canonicalFilter = params.get('product') ?? undefined
 
@@ -67,334 +59,340 @@ export function MarketplacePage() {
     category,
     canonicalProductId: canonicalFilter,
   })
-  const { data: myProfile } = useMySupplierProfile()
-  const { data: incoming } = useIncomingConnections()
-  const unread = useUnreadMessageCount()
+  const connections = useConnectionStatusMap()
 
-  const pendingIncoming = (incoming ?? []).filter((c) => c.status === 'requested').length
+  // Filters the view can't express are applied here rather than by adding
+  // columns to the query — they are all cheap predicates over rows already
+  // fetched, and round-tripping for each checkbox would make the rail feel
+  // broken on a slow connection.
+  const filtered = useMemo(() => {
+    const moqCeiling = maxMoq.trim() ? new Decimal(maxMoq) : null
 
-  const stats = useMemo(
-    () => ({
-      products: products.length,
-      suppliers: new Set(products.flatMap((p) => p.suppliers.map((s) => s.supplier_profile_id)))
-        .size,
-    }),
-    [products],
-  )
+    return products
+      .map((product) => ({
+        ...product,
+        suppliers: product.suppliers.filter((s) => {
+          if (verifiedOnly && s.verification !== 'verified') return false
+          if (inStockOnly && s.availability !== 'active') return false
+          if (connectedOnly && connections.get(s.supplier_profile_id)?.status !== 'accepted') {
+            return false
+          }
+          if (moqCeiling && new Decimal(s.min_order_qty).gt(moqCeiling)) return false
+          return true
+        }),
+      }))
+      // A product whose every offer was filtered out is not a result.
+      .filter((product) => product.suppliers.length > 0)
+      .map((product) => ({ ...product, supplierCount: product.suppliers.length }))
+  }, [products, verifiedOnly, inStockOnly, connectedOnly, maxMoq, connections])
+
+  const sorted = useMemo(() => {
+    const list = [...filtered]
+    if (sort === 'price') {
+      list.sort((a, b) => {
+        if (!a.fromPrice) return 1
+        if (!b.fromPrice) return -1
+        return a.fromPrice.comparedTo(b.fromPrice)
+      })
+    } else if (sort === 'moq') {
+      const lowest = (p: MarketplaceProduct) =>
+        Math.min(...p.suppliers.map((s) => Number(s.min_order_qty)))
+      list.sort((a, b) => lowest(a) - lowest(b))
+    } else if (sort === 'orders') {
+      const best = (p: MarketplaceProduct) =>
+        Math.max(...p.suppliers.map((s) => s.completed_orders ?? 0))
+      list.sort((a, b) => best(b) - best(a))
+    }
+    return list
+  }, [filtered, sort])
+
+  const offerCount = sorted.reduce((sum, p) => sum + p.suppliers.length, 0)
+  const activeFilterCount =
+    (verifiedOnly ? 1 : 0) +
+    (inStockOnly ? 1 : 0) +
+    (connectedOnly ? 1 : 0) +
+    (maxMoq.trim() ? 1 : 0) +
+    (category !== 'all' ? 1 : 0)
+
+  function clearFilters() {
+    setVerifiedOnly(false)
+    setInStockOnly(false)
+    setConnectedOnly(false)
+    setMaxMoq('')
+    setCategory('all')
+  }
 
   return (
     <div>
-      <PageHeader
-        eyebrow="Supplier Network"
-        title="Search products"
-        description="Every product on the network, grouped so four suppliers of the same thing are one row to compare — not four to scroll past."
-        actions={
-          <div className="flex flex-wrap gap-2">
-            {unread > 0 && (
-              <Button variant="outline" asChild>
-                <Link to="/network/messages">
-                  <MessagesSquare className="size-4" /> {unread} new message
-                  {unread === 1 ? '' : 's'}
-                </Link>
-              </Button>
-            )}
-            {pendingIncoming > 0 && (
-              <Button variant="outline" asChild>
-                <Link to="/network/connections">
-                  <Inbox className="size-4" /> {pendingIncoming} request
-                  {pendingIncoming === 1 ? '' : 's'}
-                </Link>
-              </Button>
-            )}
-            <Button variant={myProfile ? 'outline' : 'default'} asChild>
-              <Link to="/network/my-profile">
-                <Store className="size-4" />
-                {myProfile ? 'My storefront' : 'Sell on the network'}
-              </Link>
-            </Button>
-          </div>
-        }
-      />
+      <PageHeader eyebrow="Supplier Network" title="Product search" />
 
-      {/* Stat tiles, reference-style: tinted icon, big number, quiet label. */}
-      <div className="mb-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
-        <StatTile icon={Package} value={String(stats.products)} label="Products listed" />
-        <StatTile icon={Store} value={String(stats.suppliers)} label="Suppliers" />
-        <StatTile
-          icon={ShieldCheck}
-          value={myProfile?.is_public ? TIER_LABELS[normaliseTier(myProfile.trust_tier)] : '—'}
-          label="Your storefront"
-          to="/network/my-profile"
+      <div className="mb-5 flex items-center gap-3 rounded-2xl bg-card p-2 pl-5 shadow-e2">
+        <Search className="size-5 shrink-0 text-icon" aria-hidden="true" />
+        <Input
+          value={search}
+          onChange={(e) => setSearch(e.target.value)}
+          placeholder="Search products, suppliers, categories, or SKUs"
+          aria-label="Search the supplier network"
+          className="h-11 border-0 bg-transparent px-0 text-base shadow-none focus-visible:ring-0"
         />
+        <Button
+          type="button"
+          variant="outline"
+          className="shrink-0 lg:hidden"
+          onClick={() => setFiltersOpen((v) => !v)}
+        >
+          <SlidersHorizontal className="size-4" />
+          Filters
+          {activeFilterCount > 0 && <Badge variant="accent">{activeFilterCount}</Badge>}
+        </Button>
       </div>
 
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="relative min-w-56 flex-1">
-          <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-text-muted" />
-          <Input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search products, brands, or suppliers"
-            className="pl-9"
-            aria-label="Search the network"
-          />
-        </div>
-        {canonicalFilter && (
+      {canonicalFilter && (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-xl bg-tint-accent px-4 py-2.5">
+          <span className="text-sm font-medium text-tint-accent-foreground">
+            Showing one product only
+          </span>
           <Button
             variant="outline"
+            size="sm"
+            className="bg-surface"
             onClick={() => {
               params.delete('product')
               setParams(params)
             }}
           >
-            Clear product filter
+            Clear
           </Button>
-        )}
-      </div>
-
-      {(categories ?? []).length > 0 && (
-        <div className="mb-4 flex flex-wrap gap-1.5">
-          <CategoryChip active={category === 'all'} onClick={() => setCategory('all')}>
-            All
-          </CategoryChip>
-          {(categories ?? []).map((c) => (
-            <CategoryChip key={c} active={category === c} onClick={() => setCategory(c)}>
-              {c}
-            </CategoryChip>
-          ))}
         </div>
       )}
 
-      {isLoading && (
-        <div className="grid auto-rows-fr grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {Array.from({ length: 6 }).map((_, i) => (
-            <Skeleton key={i} className="h-56 w-full rounded-xl" />
-          ))}
-        </div>
-      )}
-
-      {isError && <ErrorState error={new Error('load')} onRetry={() => refetch()} />}
-
-      {!isLoading && !isError && products.length === 0 && (
-        <EmptyState
-          icon={Globe}
-          title="Nothing on the network yet"
-          description="Suppliers appear here as soon as they publish a storefront. If you sell to other businesses, you can be listed today."
-          action={
-            <Button asChild>
-              <Link to="/network/my-profile">
-                <Store className="size-4" /> Sell on the network
-              </Link>
-            </Button>
-          }
-        />
-      )}
-
-      {!isLoading && !isError && products.length > 0 && (
-        <div className="grid auto-rows-fr grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
-          {products.map((product) => (
-            <ProductCard key={product.canonicalProductId} product={product} />
-          ))}
-        </div>
-      )}
-    </div>
-  )
-}
-
-function StatTile({
-  icon: Icon,
-  value,
-  label,
-  to,
-}: {
-  icon: typeof Package
-  value: string
-  label: string
-  to?: string
-}) {
-  const body = (
-    <div className="flex min-w-0 items-center gap-3 rounded-2xl bg-card p-4 shadow-e2 transition-shadow hover:shadow-e3">
-      <IconBadge tone="accent" size="lg">
-        <Icon />
-      </IconBadge>
-      <div className="min-w-0">
-        <p className="truncate text-xl font-bold tabular-nums text-text-primary">{value}</p>
-        <p className="truncate text-xs text-text-muted">{label}</p>
-      </div>
-    </div>
-  )
-  return to ? <Link to={to}>{body}</Link> : body
-}
-
-function CategoryChip({
-  active,
-  onClick,
-  children,
-}: {
-  active: boolean
-  onClick: () => void
-  children: React.ReactNode
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      aria-pressed={active}
-      className={cn(
-        'min-h-9 rounded-full border px-3.5 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background',
-        active
-          ? 'border-transparent bg-tint-accent font-semibold text-tint-accent-foreground'
-          : 'border-border bg-surface text-text-secondary hover:bg-surface-muted hover:text-text-primary',
-      )}
-    >
-      {children}
-    </button>
-  )
-}
-
-function ProductCard({ product }: { product: MarketplaceProduct }) {
-  const [expanded, setExpanded] = useState(false)
-  const visible = expanded ? product.suppliers : product.suppliers.slice(0, 2)
-
-  return (
-    <div className="flex h-full min-w-0 flex-col overflow-hidden rounded-2xl bg-card shadow-e2 transition-shadow hover:shadow-e3">
-      <div className="flex min-w-0 items-start gap-3 p-3">
-        <span className="flex size-20 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-tint-accent/60">
-          {product.imageUrl ? (
-            <img src={product.imageUrl} alt="" className="size-full object-cover" loading="lazy" />
-          ) : (
-            <Package className="size-7 text-tint-accent-foreground/60" />
+      <div className="flex flex-col gap-6 lg:flex-row">
+        {/* Filter rail */}
+        <aside
+          className={cn(
+            'w-full shrink-0 lg:block lg:w-60',
+            filtersOpen ? 'block' : 'hidden',
           )}
-        </span>
+          aria-label="Filters"
+        >
+          <div className="rounded-2xl bg-card p-4 shadow-e2">
+            <div className="flex items-center justify-between">
+              <h2 className="type-eyebrow">Product filters</h2>
+              {activeFilterCount > 0 && (
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="text-[0.75rem] font-semibold text-accent-primary hover:underline"
+                >
+                  Clear all
+                </button>
+              )}
+            </div>
+
+            <FilterGroup label="Category">
+              <select
+                value={category}
+                onChange={(e) => setCategory(e.target.value)}
+                aria-label="Category"
+                className="h-9 w-full rounded-md border border-border bg-surface px-2 text-sm text-text-primary"
+              >
+                <option value="all">All categories</option>
+                {(categories ?? []).map((c) => (
+                  <option key={c} value={c}>
+                    {c}
+                  </option>
+                ))}
+              </select>
+            </FilterGroup>
+
+            <FilterGroup label="Maximum order minimum">
+              <Input
+                value={maxMoq}
+                onChange={(e) => setMaxMoq(e.target.value.replace(/[^\d.]/g, ''))}
+                inputMode="decimal"
+                placeholder="Any"
+                aria-label="Maximum minimum-order quantity"
+                className="h-9"
+              />
+              <p className="type-meta mt-1">
+                Hide suppliers who won't sell you fewer than this.
+              </p>
+            </FilterGroup>
+
+            <FilterGroup label="Availability">
+              <CheckRow checked={inStockOnly} onChange={setInStockOnly} label="In stock only" />
+            </FilterGroup>
+
+            <div className="mt-5 border-t border-border pt-4">
+              <h2 className="type-eyebrow">Supplier filters</h2>
+              <div className="mt-2.5 space-y-2.5">
+                <CheckRow
+                  checked={verifiedOnly}
+                  onChange={setVerifiedOnly}
+                  label="Verified suppliers only"
+                />
+                <CheckRow
+                  checked={connectedOnly}
+                  onChange={setConnectedOnly}
+                  label="Suppliers I'm connected to"
+                />
+              </div>
+              {/* Named honestly rather than shown as dead controls: the data
+                  behind distance and rating is not captured yet (brief §15 —
+                  capture first, score later). */}
+              <p className="type-meta mt-3">
+                Distance, response time and buyer rating become filters once the
+                network has enough completed orders behind them.
+              </p>
+            </div>
+          </div>
+        </aside>
+
+        {/* Results */}
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold text-text-primary">{product.productName}</p>
-          <p className="truncate text-xs text-text-muted">
-            {product.brand ?? product.category ?? 'Uncategorised'}
-          </p>
-          <p className="mt-1.5 flex min-w-0 flex-wrap items-baseline gap-x-1.5">
-            {product.fromPrice ? (
-              <>
-                <span className="text-xs text-text-secondary">from</span>
-                <span className="truncate text-base font-bold text-accent-primary">
-                  <Money value={product.fromPrice} />
-                </span>
-              </>
-            ) : (
-              <span className="text-xs text-text-muted">Price on request</span>
-            )}
-          </p>
-          <p className="mt-1 text-xs font-medium text-text-secondary">
-            {product.supplierCount} supplier{product.supplierCount === 1 ? '' : 's'} offering this
-          </p>
-        </div>
-      </div>
-
-      {/* The supplier list is a recessed well inside the card — one plane down,
-          so the card's own header still reads as the subject. */}
-      <div className="mx-3 mb-3 rounded-xl bg-background">
-        <ul className="divide-y divide-border-subtle">
-          {visible.map((row) => (
-            <SupplierOffer key={row.listing_id} row={row} />
-          ))}
-        </ul>
-
-        {product.suppliers.length > 2 && (
-          <button
-            type="button"
-            onClick={() => setExpanded((v) => !v)}
-            className="flex w-full items-center justify-center gap-1 rounded-b-xl border-t border-border-subtle py-2 text-xs font-medium text-accent-primary transition-colors hover:bg-tint-accent"
-          >
-            {expanded ? 'Show fewer' : `Compare all ${product.suppliers.length}`}
-            <ChevronDown className={cn('size-3.5 transition-transform', expanded && 'rotate-180')} />
-          </button>
-        )}
-      </div>
-    </div>
-  )
-}
-
-function SupplierOffer({ row }: { row: MarketplaceRow }) {
-  const statusMap = useConnectionStatusMap()
-  const request = useRequestConnection()
-  const existing = statusMap.get(row.supplier_profile_id)
-
-  function connect() {
-    request.mutate(row.supplier_profile_id, {
-      onSuccess: () =>
-        toast({
-          title: 'Request sent',
-          description: `${row.supplier_name} will see your request and can accept it.`,
-        }),
-      onError: (e) =>
-        toast({
-          variant: 'destructive',
-          title: "Couldn't send that request",
-          description: toReadableError(e),
-        }),
-    })
-  }
-
-  return (
-    <li className="min-w-0 p-3">
-      <div className="flex min-w-0 items-start justify-between gap-2">
-        <div className="min-w-0 flex-1">
-          <Link
-            to={`/network/suppliers/${row.supplier_profile_id}`}
-            className="block truncate text-sm font-medium text-text-primary hover:underline"
-          >
-            {row.supplier_name}
-          </Link>
-          <p className="truncate text-xs text-text-muted">
-            {row.location_text ?? 'Location not given'}
-          </p>
-        </div>
-        <div className="shrink-0 text-right">
-          {row.from_price ? (
-            <p className="text-sm font-bold tabular-nums text-accent-primary">
-              <Money value={row.from_price} />
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <p className="type-body">
+              {isLoading ? (
+                'Searching…'
+              ) : (
+                <>
+                  <strong className="font-semibold text-text-primary">{offerCount}</strong> offer
+                  {offerCount === 1 ? '' : 's'} from{' '}
+                  <strong className="font-semibold text-text-primary">{sorted.length}</strong>{' '}
+                  product{sorted.length === 1 ? '' : 's'}
+                  {debounced.trim() && <> for “{debounced.trim()}”</>}
+                </>
+              )}
             </p>
-          ) : (
-            <p className="text-xs text-text-muted">On request</p>
+            <label className="flex items-center gap-2 text-[0.8125rem] text-text-secondary">
+              Sort
+              <select
+                value={sort}
+                onChange={(e) => setSort(e.target.value as SortKey)}
+                className="h-9 rounded-md border border-border bg-surface px-2 text-sm font-medium text-text-primary"
+              >
+                {(Object.keys(SORT_LABELS) as SortKey[]).map((key) => (
+                  <option key={key} value={key}>
+                    {SORT_LABELS[key]}
+                  </option>
+                ))}
+              </select>
+            </label>
+          </div>
+
+          {isLoading && (
+            <div className="space-y-3">
+              {Array.from({ length: 3 }).map((_, i) => (
+                <Skeleton key={i} className="h-36 w-full rounded-2xl" />
+              ))}
+            </div>
           )}
-          <p className="text-xs text-text-muted">per {row.purchase_unit}</p>
+
+          {isError && <ErrorState error={new Error('load')} onRetry={() => refetch()} />}
+
+          {!isLoading && !isError && sorted.length === 0 && (
+            <EmptyState
+              icon={Globe}
+              title={activeFilterCount > 0 ? 'Nothing matches those filters' : 'Nothing found'}
+              description={
+                activeFilterCount > 0
+                  ? 'Loosen a filter — the strictest ones are usually the minimum order and verified-only.'
+                  : 'Suppliers appear here as soon as they publish a storefront. If you sell to other businesses, you can be listed today.'
+              }
+              action={
+                activeFilterCount > 0 ? (
+                  <Button variant="outline" onClick={clearFilters}>
+                    Clear filters
+                  </Button>
+                ) : (
+                  <Button asChild>
+                    <Link to="/network/my-profile">
+                      <Store className="size-4" /> Sell on the network
+                    </Link>
+                  </Button>
+                )
+              }
+            />
+          )}
+
+          {!isLoading && !isError && sorted.length > 0 && (
+            <div className="space-y-8">
+              {sorted.map((product) => (
+                <ProductGroup key={product.canonicalProductId} product={product} />
+              ))}
+            </div>
+          )}
         </div>
       </div>
-
-      <div className="mt-1.5 flex min-w-0 flex-wrap items-center gap-x-3 gap-y-1">
-        <TrustTierBadge tier={row.trust_tier} />
-        <TrustIndicators
-          facts={{
-            completed_orders: row.completed_orders,
-            fulfillment_rate: row.fulfillment_rate,
-            repeat_customers: row.repeat_customers,
-          }}
-          compact
-        />
-      </div>
-
-      <div className="mt-2 flex flex-wrap items-center justify-between gap-2">
-        <p className="text-xs text-text-muted">
-          Min order {new Decimal(row.min_order_qty).toString()} {row.purchase_unit}
-        </p>
-        <div className="flex gap-1.5">
-          <Button size="sm" variant="ghost" asChild>
-            <Link to={`/network/listings/${row.listing_id}`}>Details</Link>
-          </Button>
-          {existing?.status === 'accepted' ? (
-            <Button size="sm" variant="outline" disabled>
-              <Check className="size-3.5" /> Connected
-            </Button>
-          ) : existing?.status === 'requested' ? (
-            <Button size="sm" variant="outline" disabled>
-              <Loader2 className="size-3.5" /> Requested
-            </Button>
-          ) : (
-            <Button size="sm" variant="outline" onClick={connect} disabled={request.isPending}>
-              <Link2 className="size-3.5" /> Connect
-            </Button>
-          )}
-        </div>
-      </div>
-    </li>
+    </div>
   )
 }
+
+function ProductGroup({ product }: { product: MarketplaceProduct }) {
+  const listingIds = useMemo(() => product.suppliers.map((s) => s.listing_id), [product])
+  const { data: tiersByListing } = useListingTiersFor(listingIds)
+
+  return (
+    <section>
+      <div className="mb-2.5 flex flex-wrap items-baseline justify-between gap-x-4 gap-y-1">
+        <div className="min-w-0">
+          <Link
+            to={`/network/products/${product.canonicalProductId}`}
+            className="type-title hover:underline"
+          >
+            {product.productName}
+          </Link>
+          <p className="type-meta mt-0.5">
+            {[product.brand, product.category].filter(Boolean).join(' · ') || 'Uncategorised'} ·{' '}
+            {product.supplierCount} supplier{product.supplierCount === 1 ? '' : 's'}
+          </p>
+        </div>
+        {product.fromPrice && (
+          <p className="shrink-0 text-[0.8125rem] text-text-secondary">
+            from{' '}
+            <strong className="text-base font-bold tabular-nums text-accent-primary">
+              <Money value={product.fromPrice} />
+            </strong>
+          </p>
+        )}
+      </div>
+
+      <div className="space-y-3">
+        {product.suppliers.map((row) => (
+          <SupplierOfferRow
+            key={row.listing_id}
+            row={row}
+            tiers={tiersByListing?.get(row.listing_id)}
+          />
+        ))}
+      </div>
+    </section>
+  )
+}
+
+function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div className="mt-4">
+      <p className="mb-1.5 text-[0.8125rem] font-semibold text-text-primary">{label}</p>
+      {children}
+    </div>
+  )
+}
+
+function CheckRow({
+  checked,
+  onChange,
+  label,
+}: {
+  checked: boolean
+  onChange: (next: boolean) => void
+  label: string
+}) {
+  return (
+    <label className="flex cursor-pointer items-center gap-2.5 text-[0.8125rem] text-text-secondary">
+      <Checkbox checked={checked} onCheckedChange={(v) => onChange(v === true)} />
+      {label}
+    </label>
+  )
+}
+
