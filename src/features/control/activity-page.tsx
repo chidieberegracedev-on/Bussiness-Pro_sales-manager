@@ -43,6 +43,8 @@ export function ActivityLogPage() {
   const locale = useLocale()
   const [searchParams] = useSearchParams()
   const shiftId = searchParams.get('shift') ?? undefined
+  // Arriving from Employee performance: one person's trail, not the whole feed.
+  const memberId = searchParams.get('member') ?? undefined
 
   const [severity, setSeverity] = useState<ActivitySeverity | 'all'>('all')
   const [fromDate, setFromDate] = useState('')
@@ -50,6 +52,7 @@ export function ActivityLogPage() {
   const filters: ActivityFilters = {
     severity,
     shiftId,
+    memberId,
     from:
       fromDate && business
         ? businessDayStartUtc(new Date(`${fromDate}T12:00:00Z`), business.timezone)
@@ -58,14 +61,31 @@ export function ActivityLogPage() {
 
   const { data: events, isLoading, isError, refetch } = useActivityFeed(filters)
 
+  // The filter is by member id; the name comes back on the rows themselves, so
+  // no extra lookup is needed to title the page.
+  const memberName = memberId
+    ? (events ?? []).find((e) => e.initiated_by_name)?.initiated_by_name
+    : undefined
+
   return (
     <div>
       <PageHeader
-        title={shiftId ? 'Shift activity' : 'Activity log'}
+        eyebrow={memberId ? 'Employee performance' : undefined}
+        title={
+          memberId
+            ? memberName
+              ? `${memberName}'s activity`
+              : 'Employee activity'
+            : shiftId
+              ? 'Shift activity'
+              : 'Activity log'
+        }
         description={
-          shiftId
-            ? 'Everything that happened during this shift, in order.'
-            : 'The complete record of consequential actions. It cannot be edited or deleted by anyone.'
+          memberId
+            ? 'Every consequential action this person took, in order. The record behind the figures.'
+            : shiftId
+              ? 'Everything that happened during this shift, in order.'
+              : 'The complete record of consequential actions. It cannot be edited or deleted by anyone.'
         }
       />
 

@@ -121,6 +121,7 @@ export const NAV_ITEMS: NavItem[] = [
     roles: MANAGEMENT,
     children: [
       { label: 'Employees', to: '/employees', icon: Users },
+      { label: 'Performance', to: '/control/performance', icon: BarChart3 },
       { label: 'Live shifts', to: '/control/live-shifts', icon: Clock },
       { label: 'Reconciliation', to: '/control/reconciliation', icon: Scale },
       { label: 'Exceptions', to: '/control/exceptions', icon: ShieldQuestion },

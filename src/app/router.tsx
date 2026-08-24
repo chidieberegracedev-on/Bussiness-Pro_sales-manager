@@ -60,6 +60,7 @@ import { EmployeeDirectoryPage } from '@/features/control/employee-directory'
 import { SettingsPermissionsPage } from '@/features/control/settings-permissions'
 import { LiveShiftsPage } from '@/features/control/live-shifts-page'
 import { ShiftDiscrepanciesPage } from '@/features/control/discrepancies-page'
+import { EmployeePerformancePage } from '@/features/control/employee-performance-page'
 import { ActivityLogPage } from '@/features/control/activity-page'
 import { ExceptionsPage } from '@/features/control/exceptions-page'
 import {
@@ -185,6 +186,9 @@ export function AppRouter() {
               <Route path="/control" element={<Navigate to="/control/live-shifts" replace />} />
               <Route path="/control/live-shifts" element={<LiveShiftsPage />} />
               <Route path="/control/reconciliation" element={<ShiftDiscrepanciesPage />} />
+              {/* Employee analytics is management territory only — never /me,
+                  never the cashier workspace (12B slice 4). */}
+              <Route path="/control/performance" element={<EmployeePerformancePage />} />
               <Route path="/control/activity" element={<ActivityLogPage />} />
               <Route path="/control/exceptions" element={<ExceptionsPage />} />
             </Route>
