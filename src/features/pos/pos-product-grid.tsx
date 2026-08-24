@@ -14,6 +14,7 @@ import { EmptyState } from '@/components/data/empty-state'
 import { ErrorState } from '@/components/data/error-state'
 import { Skeleton } from '@/components/ui/skeleton'
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover'
+import { VariantPicker } from '@/features/pos/variant-picker'
 import { cn } from '@/lib/utils'
 import type { StockStatus } from '@/types/database'
 
@@ -26,15 +27,46 @@ import type { StockStatus } from '@/types/database'
  * cross the screen to the cart. That round trip is the single biggest source
  * of friction on a busy till.
  */
-export function PosProductGrid({ showImages = true }: { showImages?: boolean }) {
+export function PosProductGrid({
+  showImages = true,
+  view = 'grid',
+  categoryFirst = false,
+  barcodeFirst = true,
+  variantsEnabled = false,
+}: {
+  showImages?: boolean
+  /** 'list' packs more lines in; 'grid' is image-forward. */
+  view?: string
+  /** Make the operator choose a category before any products are listed. */
+  categoryFirst?: boolean
+  /** Lead the search field with the scanner rather than the keyboard. */
+  barcodeFirst?: boolean
+  /** Boutique: open a size/colour picker instead of a flat variant list. */
+  variantsEnabled?: boolean
+}) {
   const [search, setSearch] = useState('')
-  const [categoryId, setCategoryId] = useState<string | 'all'>('all')
+  /**
+   * `null` means the operator has not chosen yet — distinct from 'all'.
+   *
+   * It cannot be seeded from `categoryFirst`: that prop comes from
+   * business_pos_config, which loads asynchronously, so on the first render it
+   * is always false and a `useState(categoryFirst ? … : …)` initialiser would
+   * lock in the wrong value forever. The flag is applied at read time instead.
+   */
+  const [categoryId, setCategoryId] = useState<string | 'all' | null>(null)
   const debouncedSearch = useDebouncedValue(search, 250)
+  const isList = view === 'list'
+  // Category-first means exactly that: nothing is listed until a category is
+  // picked or something is typed. On a catalog of thousands, a wall of every
+  // product is not a starting point.
+  const awaitingCategory = categoryFirst && categoryId === null && !debouncedSearch.trim()
 
   const { data: categories } = useCategories()
   const { data: products, isLoading, isError, refetch } = useProductList({
     search: debouncedSearch,
-    categoryId,
+    // The list hook only understands 'all' or a real id; "not chosen" reads
+    // as everything, and category-first hides the result instead.
+    categoryId: categoryId ?? 'all',
     status: 'all',
     active: 'active',
   })
@@ -79,7 +111,11 @@ export function PosProductGrid({ showImages = true }: { showImages?: boolean }) 
             autoFocus
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            placeholder="Search or scan — name, SKU, barcode"
+            placeholder={
+              barcodeFirst
+                ? 'Scan a barcode, or search by name or SKU'
+                : 'Search by name, SKU or barcode'
+            }
             aria-label="Search products"
             className="h-14 border-0 bg-transparent px-0 text-base shadow-none focus-visible:ring-0"
           />
@@ -88,24 +124,53 @@ export function PosProductGrid({ showImages = true }: { showImages?: boolean }) 
           </kbd>
         </div>
 
-        <div className="scrollbar-none -mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1">
-          <CategoryChip active={categoryId === 'all'} onClick={() => setCategoryId('all')}>
-            All
-          </CategoryChip>
-          {categories?.map((c) => (
+        {!awaitingCategory && (
+          <div className="scrollbar-none -mx-1 mt-3 flex gap-2 overflow-x-auto px-1 pb-1">
             <CategoryChip
-              key={c.id}
-              active={categoryId === c.id}
-              onClick={() => setCategoryId(c.id)}
+              active={categoryId === 'all' || categoryId === null}
+              onClick={() => setCategoryId(categoryFirst ? null : 'all')}
             >
-              {c.name}
+              {categoryFirst ? '← Categories' : 'All'}
             </CategoryChip>
-          ))}
-        </div>
+            {categories?.map((c) => (
+              <CategoryChip
+                key={c.id}
+                active={categoryId === c.id}
+                onClick={() => setCategoryId(c.id)}
+              >
+                {c.name}
+              </CategoryChip>
+            ))}
+          </div>
+        )}
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 pb-6 pt-4 sm:px-6">
-        {isLoading && (
+        {/* Category-first landing. Big targets, because on a boutique or
+            restaurant floor this is the first thing a finger lands on. */}
+        {awaitingCategory && (
+          <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
+            <button
+              type="button"
+              onClick={() => setCategoryId('all')}
+              className="flex min-h-24 items-center justify-center rounded-2xl bg-accent-primary px-4 text-base font-bold text-primary-foreground shadow-e1"
+            >
+              Everything
+            </button>
+            {categories?.map((c) => (
+              <button
+                key={c.id}
+                type="button"
+                onClick={() => setCategoryId(c.id)}
+                className="flex min-h-24 items-center justify-center rounded-2xl bg-surface px-4 text-center text-base font-semibold text-text-primary shadow-e1 transition-shadow hover:shadow-e2"
+              >
+                {c.name}
+              </button>
+            ))}
+          </div>
+        )}
+
+        {!awaitingCategory && isLoading && (
           <div className="grid grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
             {Array.from({ length: 8 }).map((_, i) => (
               <Skeleton key={i} className="aspect-[3/4] w-full rounded-2xl" />
@@ -115,28 +180,45 @@ export function PosProductGrid({ showImages = true }: { showImages?: boolean }) 
 
         {isError && <ErrorState error={new Error('load')} onRetry={() => refetch()} />}
 
-        {!isLoading && !isError && products && products.length === 0 && (
+        {!awaitingCategory && !isLoading && !isError && products && products.length === 0 && (
           <EmptyState
             icon={Package}
             title="Nothing here"
             description={
-              search || categoryId !== 'all'
+              search || (categoryId !== 'all' && categoryId !== null)
                 ? 'Try a different search or category.'
                 : 'Add products before selling.'
             }
           />
         )}
 
-        {!isLoading && !isError && products && products.length > 0 && (
-          <div className="grid auto-rows-fr grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4">
-            {products.map((product) => (
-              <ProductTile
-                key={product.productId}
-                product={product}
-                showImage={showImages}
-                imageUrl={product.imagePath ? imageUrls?.get(product.imagePath) : undefined}
-              />
-            ))}
+        {!awaitingCategory && !isLoading && !isError && products && products.length > 0 && (
+          <div
+            className={
+              isList
+                ? 'space-y-2'
+                : 'grid auto-rows-fr grid-cols-2 gap-3 md:grid-cols-3 xl:grid-cols-4'
+            }
+          >
+            {products.map((product) =>
+              isList ? (
+                <ProductRow
+                  key={product.productId}
+                  product={product}
+                  showImage={showImages}
+                  variantsEnabled={variantsEnabled}
+                  imageUrl={product.imagePath ? imageUrls?.get(product.imagePath) : undefined}
+                />
+              ) : (
+                <ProductTile
+                  key={product.productId}
+                  product={product}
+                  showImage={showImages}
+                  variantsEnabled={variantsEnabled}
+                  imageUrl={product.imagePath ? imageUrls?.get(product.imagePath) : undefined}
+                />
+              ),
+            )}
           </div>
         )}
       </div>
@@ -151,14 +233,145 @@ const STOCK_PILL: Record<StockStatus, { label: string; className: string }> = {
   negative: { label: 'Negative', className: 'bg-tint-danger text-tint-danger-foreground' },
 }
 
-function ProductTile({
+/**
+ * The list row — the grocery personality's product line.
+ *
+ * Same data, a quarter of the vertical space. A grocery catalog is mostly
+ * scanned rather than browsed, so when someone does search, they want as many
+ * candidate lines on screen as possible, not four big pictures.
+ */
+function ProductRow({
   product,
   imageUrl,
   showImage,
+  variantsEnabled,
 }: {
   product: GroupedProduct
   imageUrl: string | undefined
   showImage: boolean
+  variantsEnabled: boolean
+}) {
+  const addLine = useCartStore((s) => s.addLine)
+  const setQuantity = useCartStore((s) => s.setQuantity)
+  const lines = useCartStore((s) => s.lines)
+
+  const only = product.variants[0]
+  const singleLine = !product.hasVariants
+    ? lines.find((l) => l.variantId === only?.variant_id)
+    : undefined
+
+  const pill = STOCK_PILL[product.worstStatus]
+
+  function addSimple() {
+    if (!only) return
+    addLine({
+      variantId: only.variant_id,
+      productName: product.productName,
+      variantName: null,
+      baseUnit: product.baseUnit,
+      unitPrice: new Decimal(only.selling_price),
+      imagePath: product.imagePath,
+    })
+  }
+
+  const body = (
+    <>
+      {showImage && (
+        <span className="flex size-11 shrink-0 items-center justify-center overflow-hidden rounded-xl bg-tint-accent/50">
+          {imageUrl ? (
+            <img src={imageUrl} alt="" className="size-full object-cover" loading="lazy" />
+          ) : (
+            <Package className="size-4 text-tint-accent-foreground/40" aria-hidden="true" />
+          )}
+        </span>
+      )}
+
+      <span className="min-w-0 flex-1">
+        <span className="block truncate text-[0.9375rem] font-semibold text-text-primary">
+          {product.productName}
+        </span>
+        <span className="type-meta block truncate">
+          {product.hasVariants
+            ? `${product.variants.length} options`
+            : (only?.sku ?? product.baseUnit)}
+          {pill && product.worstStatus !== 'ok' && ` · ${pill.label}`}
+        </span>
+      </span>
+
+      <span className="shrink-0 text-[0.9375rem] font-bold tabular-nums text-text-primary">
+        <Money value={product.priceMin} />
+        {product.priceMin !== product.priceMax && '+'}
+      </span>
+    </>
+  )
+
+  if (product.hasVariants) {
+    return (
+      <Popover>
+        <PopoverTrigger asChild>
+          <button
+            type="button"
+            className="flex w-full items-center gap-3 rounded-2xl bg-surface p-3 text-left shadow-e1 transition-shadow hover:shadow-e2"
+          >
+            {body}
+          </button>
+        </PopoverTrigger>
+        <PopoverContent align="start" className={variantsEnabled ? 'w-80' : 'w-72'}>
+          {variantsEnabled ? (
+            <VariantPicker product={product} />
+          ) : (
+            <>
+              <p className="type-eyebrow mb-2">Choose an option</p>
+              <VariantList product={product} />
+            </>
+          )}
+        </PopoverContent>
+      </Popover>
+    )
+  }
+
+  return (
+    <div className="flex w-full items-center gap-3 rounded-2xl bg-surface p-3 shadow-e1">
+      {body}
+      {singleLine ? (
+        <div className="flex shrink-0 items-center gap-1 rounded-full bg-accent-primary p-1 text-primary-foreground">
+          <StepButton
+            label={`Remove one ${product.productName}`}
+            onClick={() => setQuantity(singleLine.variantId, singleLine.quantity.minus(1))}
+          >
+            <Minus className="size-3.5" />
+          </StepButton>
+          <span className="min-w-6 text-center text-sm font-bold tabular-nums">
+            {singleLine.quantity.toString()}
+          </span>
+          <StepButton label={`Add one ${product.productName}`} onClick={addSimple}>
+            <Plus className="size-3.5" />
+          </StepButton>
+        </div>
+      ) : (
+        <button
+          type="button"
+          onClick={addSimple}
+          aria-label={`Add ${product.productName}`}
+          className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-background text-text-primary transition-colors hover:bg-tint-accent"
+        >
+          <Plus className="size-4" />
+        </button>
+      )}
+    </div>
+  )
+}
+
+function ProductTile({
+  product,
+  imageUrl,
+  showImage,
+  variantsEnabled,
+}: {
+  product: GroupedProduct
+  imageUrl: string | undefined
+  showImage: boolean
+  variantsEnabled: boolean
 }) {
   const addLine = useCartStore((s) => s.addLine)
   const setQuantity = useCartStore((s) => s.setQuantity)
@@ -293,9 +506,18 @@ function ProductTile({
             {tile}
           </button>
         </PopoverTrigger>
-        <PopoverContent align="start" className="w-72">
-          <p className="type-eyebrow mb-2">Choose an option</p>
-          <VariantList product={product} />
+        <PopoverContent align="start" className={variantsEnabled ? 'w-80' : 'w-72'}>
+          {/* Boutique gets axis pickers; everything else gets the flat list,
+              which is faster when a product has three variants rather than
+              a size/colour matrix. */}
+          {variantsEnabled ? (
+            <VariantPicker product={product} />
+          ) : (
+            <>
+              <p className="type-eyebrow mb-2">Choose an option</p>
+              <VariantList product={product} />
+            </>
+          )}
         </PopoverContent>
       </Popover>
     )

@@ -109,7 +109,10 @@ export function PosWorkspace() {
 
   const drawerCash = summary.data?.drawerCash ?? new Decimal(openShift?.opening_float ?? '0')
   const operatorName = context?.display_name ?? membership?.display_name ?? 'Operator'
-  const heldCount = (held ?? []).length
+  // Off means gone, not greyed: a till that offers Hold and then refuses is
+  // worse than one that never offered it.
+  const holdEnabled = config?.allow_hold_resume ?? true
+  const heldCount = holdEnabled ? (held ?? []).length : 0
 
   async function clearBasket() {
     if (lines.length === 0) return
@@ -182,8 +185,8 @@ export function PosWorkspace() {
   useRegistryShortcuts(
     {
       onPay: () => lines.length > 0 && setPaymentOpen(true),
-      onHold: () => void hold(),
-      onResume: () => setPanel('held'),
+      onHold: () => holdEnabled && void hold(),
+      onResume: () => holdEnabled && setPanel('held'),
       onPettyCash: () => openShift && setExpenseOpen(true),
       onSafeDrop: () => void requestSafeDrop(),
       onShift: () => setPanel('shift'),
@@ -197,12 +200,16 @@ export function PosWorkspace() {
       {
         items: [
           { label: 'Sell', icon: ShoppingCart, active: true, onClick: () => setPanel(null) },
-          {
-            label: 'Held orders',
-            icon: PauseCircle,
-            badge: heldCount,
-            onClick: () => setPanel('held'),
-          },
+          ...(holdEnabled
+            ? [
+                {
+                  label: 'Held orders',
+                  icon: PauseCircle,
+                  badge: heldCount,
+                  onClick: () => setPanel('held'),
+                },
+              ]
+            : []),
           { label: 'Recent sales', icon: History, onClick: () => setPanel('history') },
         ],
       },
@@ -219,7 +226,7 @@ export function PosWorkspace() {
         ],
       },
     ],
-    [heldCount, openShift, operatorName],
+    [heldCount, holdEnabled, openShift, operatorName],
   )
 
   return (
@@ -288,12 +295,14 @@ export function PosWorkspace() {
               tone={openShift ? 'neutral' : 'warning'}
               onClick={() => setPanel('shift')}
             />
-            <WorkspaceTool
-              icon={PauseCircle}
-              label="Held orders"
-              badge={heldCount}
-              onClick={() => setPanel('held')}
-            />
+            {holdEnabled && (
+              <WorkspaceTool
+                icon={PauseCircle}
+                label="Held orders"
+                badge={heldCount}
+                onClick={() => setPanel('held')}
+              />
+            )}
             <WorkspaceTool icon={Banknote} label="Cash drawer" onClick={() => setPanel('cash')} />
             <WorkspaceTool icon={History} label="Recent sales" onClick={() => setPanel('history')} />
             <WorkspaceTool icon={UserRound} label="Operator" onClick={() => setPanel('profile')} />
@@ -322,7 +331,15 @@ export function PosWorkspace() {
               </div>
             )}
             <div className="min-h-0 flex-1">
-              <PosProductGrid showImages={config?.show_product_images ?? true} />
+              {/* Every one of these comes from business_pos_config — changing
+                  a switch in Settings changes this screen. */}
+              <PosProductGrid
+                showImages={config?.show_product_images ?? true}
+                view={config?.product_view ?? 'grid'}
+                categoryFirst={config?.category_first ?? false}
+                barcodeFirst={config?.barcode_first ?? true}
+                variantsEnabled={config?.variants_enabled ?? false}
+              />
             </div>
           </div>
 
@@ -416,7 +433,8 @@ export function PosWorkspace() {
           setPanel(null)
           void hold()
         }}
-        canHold={lines.length > 0}
+        canHold={holdEnabled && lines.length > 0}
+        holdEnabled={holdEnabled}
         onLock={() => lock.mutate()}
         onSignOut={() => endSession.mutate()}
       />
@@ -669,6 +687,7 @@ function ProfilePanel({
   hasSession,
   onHold,
   canHold,
+  holdEnabled,
   onLock,
   onSignOut,
 }: {
@@ -680,6 +699,7 @@ function ProfilePanel({
   hasSession: boolean
   onHold: () => void
   canHold: boolean
+  holdEnabled: boolean
   onLock: () => void
   onSignOut: () => void
 }) {
@@ -698,13 +718,15 @@ function ProfilePanel({
       </div>
 
       <div className="mt-4 space-y-2">
-        <PanelAction
-          icon={PauseCircle}
-          title="Hold this sale"
-          body="Park the basket and start a new one."
-          onClick={onHold}
-          disabled={!canHold}
-        />
+        {holdEnabled && (
+          <PanelAction
+            icon={PauseCircle}
+            title="Hold this sale"
+            body="Park the basket and start a new one."
+            onClick={onHold}
+            disabled={!canHold}
+          />
+        )}
         {hasSession && (
           <>
             <PanelAction
