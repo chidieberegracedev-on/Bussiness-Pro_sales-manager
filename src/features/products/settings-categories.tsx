@@ -5,7 +5,11 @@ import {
   useCreateCategory,
   useDeleteCategory,
   useRenameCategory,
+  useSetCategoryIcon,
+  ICONS_UNAVAILABLE_REASON,
 } from '@/features/products/categories-hooks'
+import { CategoryIconPicker } from '@/features/products/category-icon-picker'
+import { suggestIconForName } from '@/features/products/category-icons'
 import { toReadableError } from '@/lib/errors'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -26,12 +30,17 @@ import { TableSkeleton } from '@/components/data/loading-state'
 import { toast } from '@/hooks/use-toast'
 
 export function SettingsCategoriesPage() {
-  const { data: categories, isLoading, isError, refetch } = useCategories()
+  const { data: categories, isLoading, isError, refetch, iconsAvailable } = useCategories()
   const createCategory = useCreateCategory()
   const renameCategory = useRenameCategory()
   const deleteCategory = useDeleteCategory()
+  const setCategoryIcon = useSetCategoryIcon()
 
   const [newName, setNewName] = useState('')
+  const [newIcon, setNewIcon] = useState<string | null>(null)
+  // Cleared as soon as the user picks for themselves, so a suggestion never
+  // overwrites a deliberate choice on the next keystroke.
+  const [iconTouched, setIconTouched] = useState(false)
   const [editingId, setEditingId] = useState<string | null>(null)
   const [editingName, setEditingName] = useState('')
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -41,8 +50,10 @@ export function SettingsCategoriesPage() {
     const trimmed = newName.trim()
     if (!trimmed) return
     try {
-      await createCategory.mutateAsync(trimmed)
+      await createCategory.mutateAsync({ name: trimmed, icon: newIcon })
       setNewName('')
+      setNewIcon(null)
+      setIconTouched(false)
     } catch (error) {
       toast({ variant: 'destructive', title: "Couldn't add category", description: toReadableError(error) })
     }
@@ -77,9 +88,20 @@ export function SettingsCategoriesPage() {
       </CardHeader>
       <CardContent className="space-y-4">
         <form onSubmit={handleCreate} className="flex gap-2">
+          <CategoryIconPicker
+            value={newIcon}
+            onChange={(next) => {
+              setIconTouched(true)
+              setNewIcon(next)
+            }}
+            disabled={!iconsAvailable}
+          />
           <Input
             value={newName}
-            onChange={(e) => setNewName(e.target.value)}
+            onChange={(e) => {
+              setNewName(e.target.value)
+              if (!iconTouched) setNewIcon(suggestIconForName(e.target.value)?.key ?? null)
+            }}
             placeholder="New category name"
             aria-label="New category name"
           />
@@ -88,6 +110,8 @@ export function SettingsCategoriesPage() {
             Add
           </Button>
         </form>
+
+        {!iconsAvailable && <p className="type-meta">{ICONS_UNAVAILABLE_REASON}</p>}
 
         {isLoading && <TableSkeleton rows={4} columns={1} />}
         {isError && <ErrorState error={new Error('load')} onRetry={() => refetch()} />}
@@ -118,6 +142,22 @@ export function SettingsCategoriesPage() {
                   </>
                 ) : (
                   <>
+                    <CategoryIconPicker
+                      value={category.icon}
+                      onChange={(icon) =>
+                        setCategoryIcon
+                          .mutateAsync({ id: category.id, icon })
+                          .catch((error) =>
+                            toast({
+                              variant: 'destructive',
+                              title: "Couldn't set the icon",
+                              description: toReadableError(error),
+                            }),
+                          )
+                      }
+                      disabled={!iconsAvailable}
+                      triggerLabel="Icon"
+                    />
                     <span className="flex-1 text-sm text-text-primary">{category.name}</span>
                     <Button
                       size="icon"

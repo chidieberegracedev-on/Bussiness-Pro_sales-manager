@@ -4,7 +4,7 @@ import { useForm, useFieldArray } from 'react-hook-form'
 import { Loader2 } from 'lucide-react'
 import { useProductDetail } from '@/features/products/use-product-detail'
 import { useHasMovements, useUpdateProduct, useUpdateVariant } from '@/features/products/use-product-mutations'
-import { useCategories } from '@/features/products/categories-hooks'
+import { CategoryField } from '@/features/products/category-field'
 import { variantLabel } from '@/features/products/types'
 import { uploadBusinessScopedImage, toUploadErrorMessage } from '@/lib/image-upload'
 import { useSignedImageUrl } from '@/hooks/use-signed-image-url'
@@ -18,7 +18,6 @@ import { Input } from '@/components/ui/input'
 import { Textarea } from '@/components/ui/textarea'
 import { Switch } from '@/components/ui/switch'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table'
 import { UnitSelect } from '@/components/quantity/unit-select'
 import { QuantityInput } from '@/components/quantity/quantity-input'
@@ -45,7 +44,6 @@ export function EditProductPage() {
   const { id } = useParams<{ id: string }>()
   const navigate = useNavigate()
   const { business } = useActiveBusiness()
-  const { data: categories } = useCategories()
   const { product, variants, isLoading, isError, refetch } = useProductDetail(id)
   const variantIds = variants?.map((v) => v.variant_id)
   const { data: hasMovements } = useHasMovements(variantIds)
@@ -101,8 +99,6 @@ export function EditProductPage() {
   const hasPurchaseUnit = form.watch('hasPurchaseUnit')
 
   const selectedCategoryId = form.watch('categoryId')
-  const selectedCategoryLabel =
-    categories?.find((c) => c.id === selectedCategoryId)?.name ?? 'No category'
 
   async function handleImageSelect(file: File) {
     if (!business) return
@@ -179,27 +175,16 @@ export function EditProductPage() {
                   <Input className="mt-1.5" {...form.register('name', { required: true })} />
                 </div>
                 <div>
-                  <label className="text-sm font-medium text-text-primary">Category</label>
-                  <Select
-                    value={selectedCategoryId || 'none'}
-                    onValueChange={(v) => form.setValue('categoryId', v === 'none' ? '' : v)}
-                  >
-                    <SelectTrigger className="mt-1.5">
-                      {/* Render the resolved name as children rather than letting
-                          SelectValue look it up from the items: the product query
-                          resolves before the categories query, so at the moment
-                          categoryId is set there is no matching SelectItem yet and
-                          Radix never re-resolves the label once they mount
-                          (Fix 009 §Issue 1). */}
-                      <SelectValue placeholder="No category">{selectedCategoryLabel}</SelectValue>
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="none">No category</SelectItem>
-                      {categories?.map((c) => (
-                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
+                  <label className="text-sm font-medium text-text-primary" htmlFor="edit-category">
+                    Category
+                  </label>
+                  <div className="mt-1.5">
+                    <CategoryField
+                      id="edit-category"
+                      value={selectedCategoryId}
+                      onChange={(v) => form.setValue('categoryId', v)}
+                    />
+                  </div>
                 </div>
               </div>
             </div>

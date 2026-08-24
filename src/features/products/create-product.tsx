@@ -10,7 +10,7 @@ import { toReadableError } from '@/lib/errors'
 import { uploadBusinessScopedImage, createSignedImageUrl, toUploadErrorMessage } from '@/lib/image-upload'
 import { PRODUCT_IMAGE_BUCKET } from '@/lib/storage-buckets'
 import { useActiveBusiness } from '@/features/business/hooks'
-import { useCategories } from '@/features/products/categories-hooks'
+import { CategoryField } from '@/features/products/category-field'
 import { createProductSchema, type CreateProductValues } from '@/features/products/schemas'
 import { OptionsBuilder, type OptionDef } from '@/features/products/options-builder'
 import { CombinationTable } from '@/features/products/combination-table'
@@ -20,7 +20,6 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Switch } from '@/components/ui/switch'
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage, FormDescription } from '@/components/ui/form'
 import { UnitSelect } from '@/components/quantity/unit-select'
 import { QuantityInput } from '@/components/quantity/quantity-input'
@@ -47,7 +46,6 @@ export function CreateProductPage() {
   const navigate = useNavigate()
   const queryClient = useQueryClient()
   const { business } = useActiveBusiness()
-  const { data: categories } = useCategories()
 
   const [serverError, setServerError] = useState<string | null>(null)
   const online = useOnlineStatus()
@@ -197,19 +195,9 @@ export function CreateProductPage() {
                     render={({ field }) => (
                       <FormItem>
                         <FormLabel>Category</FormLabel>
-                        <Select value={field.value || 'none'} onValueChange={(v) => field.onChange(v === 'none' ? '' : v)}>
-                          <FormControl>
-                            <SelectTrigger>
-                              <SelectValue placeholder="No category" />
-                            </SelectTrigger>
-                          </FormControl>
-                          <SelectContent>
-                            <SelectItem value="none">No category</SelectItem>
-                            {categories?.map((c) => (
-                              <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
-                            ))}
-                          </SelectContent>
-                        </Select>
+                        <FormControl>
+                          <CategoryField value={field.value ?? ''} onChange={field.onChange} />
+                        </FormControl>
                       </FormItem>
                     )}
                   />

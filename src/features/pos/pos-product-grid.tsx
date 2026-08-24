@@ -3,6 +3,7 @@ import Decimal from 'decimal.js'
 import { Minus, Package, Plus, Search } from 'lucide-react'
 import { useProductList } from '@/features/products/use-product-list'
 import { useCategories } from '@/features/products/categories-hooks'
+import { CategoryIconGlyph } from '@/features/products/category-icon-picker'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { useCartStore } from '@/features/pos/cart-store'
 import { variantLabel, type GroupedProduct } from '@/features/products/types'
@@ -138,6 +139,7 @@ export function PosProductGrid({
                 active={categoryId === c.id}
                 onClick={() => setCategoryId(c.id)}
               >
+                <CategoryIconGlyph icon={c.icon} className="mr-1.5" />
                 {c.name}
               </CategoryChip>
             ))}
@@ -162,8 +164,9 @@ export function PosProductGrid({
                 key={c.id}
                 type="button"
                 onClick={() => setCategoryId(c.id)}
-                className="flex min-h-24 items-center justify-center rounded-2xl bg-surface px-4 text-center text-base font-semibold text-text-primary shadow-e1 transition-shadow hover:shadow-e2"
+                className="flex min-h-24 flex-col items-center justify-center gap-1.5 rounded-2xl bg-surface px-4 text-center text-base font-semibold text-text-primary shadow-e1 transition-shadow hover:shadow-e2"
               >
+                <CategoryIconGlyph icon={c.icon} className="text-2xl" />
                 {c.name}
               </button>
             ))}
