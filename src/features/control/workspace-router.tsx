@@ -3,7 +3,7 @@ import { Navigate, Outlet } from 'react-router-dom'
 import { useEmployeeSessionStore, getTerminalId } from '@/features/control/session-store'
 import { useRestoreSession, useAutoLock } from '@/features/control/use-session'
 import { OperatorSelectionScreen } from '@/features/control/operator-selection'
-import { RegistryWorkspace } from '@/features/control/registry-workspace'
+import { PosWorkspace } from '@/features/pos/pos-workspace'
 import { FullPageLoading } from '@/components/layout/full-page-loading'
 import { PermissionDeniedState } from '@/components/data/error-state'
 import { useActiveBusiness } from '@/features/business/hooks'
@@ -74,7 +74,7 @@ export function WorkspaceGate() {
 
   // An operator has passed the PIN gate: their role decides the workspace.
   if (context?.status === 'active') {
-    if (context.role === 'cashier') return <RegistryWorkspace />
+    if (context.role === 'cashier') return <PosWorkspace />
     return <Outlet />
   }
 
@@ -117,9 +117,14 @@ export function RequireManagementAccess({ roles }: { roles?: MemberRole[] }) {
 }
 
 /**
- * Standalone Registry route, so a cashier always has somewhere real to land.
+ * Standalone till route, so a cashier always has somewhere real to land.
  * In single-owner mode there are no cashiers, so it is simply the owner's own
  * till view — no PIN in front of it.
+ *
+ * This renders the POS WORKSPACE: its own shell, its own navigation, its own
+ * top-bar tools. A cashier never sees the management sidebar, filtered or
+ * otherwise — "the admin console with things hidden" is the feeling this
+ * whole route exists to avoid.
  */
 export function RegistryRoute() {
   useRestoreSession()
@@ -130,8 +135,8 @@ export function RegistryRoute() {
 
   useAutoLock(isMultiOperator && !!context && context.status === 'active')
 
-  if (!isMultiOperator) return <RegistryWorkspace />
+  if (!isMultiOperator) return <PosWorkspace />
   if (token && !context && !restored) return <FullPageLoading />
   if (!context || context.status !== 'active') return <OperatorSelectionScreen />
-  return <RegistryWorkspace />
+  return <PosWorkspace />
 }

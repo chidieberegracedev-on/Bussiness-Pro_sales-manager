@@ -233,6 +233,55 @@ export interface Database {
         Update: never
         Relationships: []
       }
+      /**
+       * Per-business POS configuration (0029). Relational on purpose — these
+       * are real switches the interface reads on every render, not free-form
+       * notes, and a jsonb blob would make each one unqueryable and untypable.
+       * Only genuinely open-ended toggles go in `free_form`.
+       */
+      business_pos_config: {
+        Row: {
+          business_id: string
+          product_view: string
+          category_first: boolean
+          show_product_images: boolean
+          barcode_first: boolean
+          allow_hold_resume: boolean
+          capture_customer: boolean
+          allow_line_discount: boolean
+          tables_enabled: boolean
+          modifiers_enabled: boolean
+          kitchen_workflow_enabled: boolean
+          variants_enabled: boolean
+          returns_enabled: boolean
+          receipt_footer: string | null
+          free_form: Record<string, unknown>
+          updated_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['business_pos_config']['Row']> & {
+          business_id: string
+        }
+        Update: Partial<Database['public']['Tables']['business_pos_config']['Row']>
+        Relationships: []
+      }
+      /** One operator's personal workspace preferences (0029). */
+      employee_preferences: {
+        Row: {
+          member_id: string
+          business_id: string
+          pos_layout: string
+          input_mode: string
+          sidebar_width: string
+          notify_prefs: Record<string, unknown>
+          updated_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['employee_preferences']['Row']> & {
+          member_id: string
+          business_id: string
+        }
+        Update: Partial<Database['public']['Tables']['employee_preferences']['Row']>
+        Relationships: []
+      }
       supplier_connections: {
         Row: {
           id: string
@@ -369,6 +418,12 @@ export interface Database {
            * whole Phase 8 control layer becomes live (0018).
            */
           operator_mode: OperatorMode
+          /**
+           * Which POS experience this business gets (0029). One engine —
+           * products, inventory, sales, payments, employees and receipts are
+           * shared regardless. The type only switches interface and workflow.
+           */
+          business_type: BusinessVertical
           created_at: string
           updated_at: string
         }
@@ -1842,6 +1897,9 @@ export type ConnectStatus = 'requested' | 'accepted' | 'declined' | 'revoked'
  * ranking and badges rather than whether they exist.
  */
 export type TrustTier = 'provisional' | 'verified' | 'trusted' | 'preferred'
+
+/** 0029. Selects the POS experience; never forks the data model. */
+export type BusinessVertical = 'general' | 'grocery' | 'boutique' | 'restaurant'
 
 /**
  * pin_unlock / unlock_session return a result rather than raising on a bad PIN.

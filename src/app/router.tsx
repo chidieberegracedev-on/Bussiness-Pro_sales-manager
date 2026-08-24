@@ -17,7 +17,6 @@ import { ProductDetailPage } from '@/features/products/product-detail'
 import { EditProductPage } from '@/features/products/edit-product'
 import { LowStockPage } from '@/features/inventory/low-stock'
 import { MovementHistoryPage } from '@/features/inventory/movement-history'
-import { PosPage } from '@/features/pos/pos-page'
 import { SalesListPage } from '@/features/sales/sales-list'
 import { SaleDetailPage } from '@/features/sales/sale-detail'
 import { DashboardPage } from '@/features/analytics/dashboard'
@@ -67,6 +66,7 @@ import {
   RequireManagementAccess,
   RegistryRoute,
 } from '@/features/control/workspace-router'
+import { EmployeeWorkspaceRoutes } from '@/features/employee/employee-workspace'
 import { NotFoundPage } from '@/features/misc/not-found'
 
 const MANAGE_ROLES = ['owner', 'manager'] as const
@@ -88,8 +88,12 @@ export function AppRouter() {
         <Route path="/select-business" element={<SelectBusinessPage />} />
 
         <Route element={<RequireBusiness />}>
-          {/* The Registry is its own full-screen workspace — no management shell. */}
+          {/* Role-scoped workspaces. Each is a full-screen shell with its OWN
+              navigation — deliberately outside AppShell, so neither ever shows
+              the management sidebar. */}
           <Route path="/registry" element={<RegistryRoute />} />
+          <Route path="/till" element={<RegistryRoute />} />
+          <Route path="/me/*" element={<EmployeeWorkspaceRoutes />} />
 
           {/* Everything below is the management workspace. WorkspaceGate sends a
               PIN-unlocked cashier to the Registry instead. */}
@@ -98,7 +102,9 @@ export function AppRouter() {
             <Route index element={<Navigate to="/dashboard" replace />} />
 
             <Route path="/dashboard" element={<DashboardPage />} />
-            <Route path="/pos" element={<PosPage />} />
+            {/* Management's own till link goes to the POS workspace too — one
+                selling surface, not a second implementation for owners. */}
+            <Route path="/pos" element={<Navigate to="/till" replace />} />
             <Route path="/sales" element={<SalesListPage />} />
             <Route path="/sales/:id" element={<SaleDetailPage />} />
 

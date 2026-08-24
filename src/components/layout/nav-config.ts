@@ -33,6 +33,7 @@ import {
   Store,
   Search,
   Tag,
+  UserRound,
 } from 'lucide-react'
 import type { MemberRole } from '@/types/database'
 
@@ -68,7 +69,10 @@ export interface NavSection {
 
 export const NAV_ITEMS: NavItem[] = [
   { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard, roles: MANAGEMENT },
-  { label: 'POS', to: '/pos', icon: ShoppingCart, roles: MANAGEMENT },
+  // Both of these leave the management shell for a role-scoped workspace with
+  // its own navigation — that is the point, not an accident of routing.
+  { label: 'Open the till', to: '/till', icon: ShoppingCart, roles: MANAGEMENT },
+  { label: 'My work', to: '/me', icon: UserRound },
   { label: 'Sales', to: '/sales', icon: Receipt, roles: MANAGEMENT },
   { label: 'Products', to: '/products', icon: Package, roles: BACKROOM },
   {

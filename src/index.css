@@ -7,11 +7,15 @@
   /* Cards separate from the page by CONTRAST, not shadow: a soft warm gray
      page with white cards sitting on it. Pure white everywhere forces every
      boundary to be drawn with a drop-shadow, which is what reads as generic. */
-  /* Three readable levels, deepest first: page (96%) → section panel (98%,
-     warm) → card (pure white, lifted). One percent of lightness is enough
-     when the hue is warm and the card carries elevation-2. */
-  --background: 40 22% 96%;
-  --background-subtle: 40 18% 94.5%;
+  /* Three readable levels, deepest first: page → section panel → card (pure
+     white, lifted).
+
+     The page is the warm off-white taken from the POS references — a soft
+     paper tone, not a blue-grey admin console. It is deliberately two points
+     deeper than a "safe" near-white: white cards have to visibly float on it,
+     and at 96% they didn't. This one value sets the whole app's temperature. */
+  --background: 44 17% 94%;
+  --background-subtle: 44 15% 92%;
   --surface: 0 0% 100%;
   --surface-elevated: 0 0% 100%;
   /* Deeper than the page, or an image well reads as a hole in the card
