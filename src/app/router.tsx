@@ -44,6 +44,7 @@ import { CalculatorPage } from '@/features/help/calculator-page'
 import { LearningCenterPage } from '@/features/help/learning-page'
 import { SettingsTerminalsPage } from '@/features/control/settings-terminals'
 import { SettingsPosPage } from '@/features/pos/settings-pos'
+import { SettingsFloorPlanPage } from '@/features/restaurant/settings-floor-plan'
 import { CountSessionsPage } from '@/features/counting/count-sessions-page'
 import { CountSessionPage } from '@/features/counting/count-session-page'
 import { PrintQueuePage } from '@/features/print/print-queue-page'
@@ -206,6 +207,7 @@ export function AppRouter() {
                 <Route path="categories" element={<SettingsCategoriesPage />} />
                 <Route path="employees" element={<Navigate to="/employees" replace />} />
                 <Route path="pos" element={<SettingsPosPage />} />
+                <Route path="floor-plan" element={<SettingsFloorPlanPage />} />
               <Route path="terminals" element={<SettingsTerminalsPage />} />
                 <Route path="printing" element={<PrintQueuePage />} />
                 <Route path="permissions" element={<SettingsPermissionsPage />} />

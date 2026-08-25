@@ -2,14 +2,23 @@ import { NavLink, Outlet } from 'react-router-dom'
 import { cn } from '@/lib/utils'
 import { PageHeader } from '@/components/layout/page-header'
 import { useActiveBusiness } from '@/features/business/hooks'
+import { useBusinessVertical, usePosConfig } from '@/features/pos/use-pos-config'
 import type { MemberRole } from '@/types/database'
 
 const ALL_ROLES: MemberRole[] = ['owner', 'manager', 'inventory_staff', 'cashier']
 
-const TABS: { to: string; label: string; roles: MemberRole[] }[] = [
+const TABS: { to: string; label: string; roles: MemberRole[]; restaurantOnly?: boolean }[] = [
   { to: '/settings/business', label: 'Business', roles: ['owner', 'manager'] },
   { to: '/settings/categories', label: 'Categories', roles: ['owner', 'manager'] },
   { to: '/settings/pos', label: 'Till', roles: ['owner', 'manager'] },
+  // Only a restaurant has a floor to plan. Showing the tab to a grocer is the
+  // "read past someone else's settings to find yours" problem in miniature.
+  {
+    to: '/settings/floor-plan',
+    label: 'Floor plan',
+    roles: ['owner', 'manager'],
+    restaurantOnly: true,
+  },
   { to: '/settings/terminals', label: 'Terminals', roles: ['owner', 'manager'] },
   { to: '/settings/printing', label: 'Printing & scanning', roles: ['owner', 'manager'] },
   { to: '/settings/permissions', label: 'Permissions', roles: ['owner', 'manager'] },
@@ -18,7 +27,14 @@ const TABS: { to: string; label: string; roles: MemberRole[] }[] = [
 
 export function SettingsLayout() {
   const { role } = useActiveBusiness()
-  const tabs = TABS.filter((t) => !role || t.roles.includes(role))
+  const vertical = useBusinessVertical()
+  const { data: config } = usePosConfig()
+  // Tables can be switched on for a business of any type, so the tab follows
+  // the switch as well as the vertical — never the vertical alone.
+  const showFloorPlan = vertical === 'restaurant' || !!config?.tables_enabled
+  const tabs = TABS.filter(
+    (t) => (!role || t.roles.includes(role)) && (!t.restaurantOnly || showFloorPlan),
+  )
 
   return (
     <div>
