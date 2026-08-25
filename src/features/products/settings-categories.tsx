@@ -6,7 +6,6 @@ import {
   useDeleteCategory,
   useRenameCategory,
   useSetCategoryIcon,
-  ICONS_UNAVAILABLE_REASON,
 } from '@/features/products/categories-hooks'
 import { CategoryIconPicker } from '@/features/products/category-icon-picker'
 import { suggestIconForName } from '@/features/products/category-icons'
@@ -30,7 +29,7 @@ import { TableSkeleton } from '@/components/data/loading-state'
 import { toast } from '@/hooks/use-toast'
 
 export function SettingsCategoriesPage() {
-  const { data: categories, isLoading, isError, refetch, iconsAvailable } = useCategories()
+  const { data: categories, isLoading, isError, refetch } = useCategories()
   const createCategory = useCreateCategory()
   const renameCategory = useRenameCategory()
   const deleteCategory = useDeleteCategory()
@@ -94,7 +93,6 @@ export function SettingsCategoriesPage() {
               setIconTouched(true)
               setNewIcon(next)
             }}
-            disabled={!iconsAvailable}
           />
           <Input
             value={newName}
@@ -110,8 +108,6 @@ export function SettingsCategoriesPage() {
             Add
           </Button>
         </form>
-
-        {!iconsAvailable && <p className="type-meta">{ICONS_UNAVAILABLE_REASON}</p>}
 
         {isLoading && <TableSkeleton rows={4} columns={1} />}
         {isError && <ErrorState error={new Error('load')} onRetry={() => refetch()} />}
@@ -155,7 +151,6 @@ export function SettingsCategoriesPage() {
                             }),
                           )
                       }
-                      disabled={!iconsAvailable}
                       triggerLabel="Icon"
                     />
                     <span className="flex-1 text-sm text-text-primary">{category.name}</span>

@@ -18,6 +18,19 @@ export type AuthorizedAction =
   | 'void'
 export type HeldBasketStatus = 'held' | 'resumed' | 'discarded'
 export type MemberStatus = 'active' | 'invited' | 'suspended'
+/** 0030 restaurant operations. A table's stored state carries only what no
+    order can express — `cleaning` — because every other state is derived from
+    the table's open order rather than written twice. */
+export type TableState = 'available' | 'seated' | 'ordering' | 'served' | 'bill' | 'cleaning'
+export type RestaurantOrderState =
+  | 'open'
+  | 'sent'
+  | 'preparing'
+  | 'ready'
+  | 'served'
+  | 'closed'
+  | 'cancelled'
+export type ServiceMode = 'dine_in' | 'takeaway' | 'delivery'
 /** Which half of the product a business is running (0018). */
 export type OperatorMode = 'single_owner' | 'multi_operator'
 export type StockMovementType =
@@ -477,6 +490,9 @@ export interface Database {
           id: string
           business_id: string
           name: string
+          /** Curated icon key or a single emoji — visual metadata, never a
+              file path. Added by 0031. */
+          icon: string | null
           created_at: string
           updated_at: string
         }
@@ -617,6 +633,10 @@ export interface Database {
           cost_total: string
           currency_code: string
           sold_by: string | null
+          /** 0030: a return points at the sale it reverses. */
+          parent_sale_id: string | null
+          is_return: boolean
+          customer_id: string | null
           note: string | null
           voided_at: string | null
           voided_by: string | null
@@ -652,6 +672,9 @@ export interface Database {
           quantity: string
           unit_price: string
           unit_cost: string
+          /** 0030. complete_sale still derives unit_price server-side; the
+              client may propose a discount, never a price. */
+          discount_amount: string
           line_total: string
           line_cost: string
           created_at: string
@@ -1046,6 +1069,144 @@ export interface Database {
           action: AuthorizedAction
         }
         Update: Partial<Database['public']['Tables']['permission_limits']['Row']>
+        Relationships: []
+      }
+      customers: {
+        Row: {
+          id: string
+          business_id: string
+          name: string
+          phone: string | null
+          email: string | null
+          note: string | null
+          created_at: string
+          updated_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['customers']['Row']> & {
+          business_id: string
+          name: string
+        }
+        Update: Partial<Database['public']['Tables']['customers']['Row']>
+        Relationships: []
+      }
+      dining_areas: {
+        Row: {
+          id: string
+          business_id: string
+          location_id: string
+          name: string
+          sort_order: number
+          created_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['dining_areas']['Row']> & {
+          business_id: string
+          location_id: string
+          name: string
+        }
+        Update: Partial<Database['public']['Tables']['dining_areas']['Row']>
+        Relationships: []
+      }
+      dining_tables: {
+        Row: {
+          id: string
+          business_id: string
+          area_id: string | null
+          label: string
+          seats: number
+          state: TableState
+          sort_order: number
+          created_at: string
+          updated_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['dining_tables']['Row']> & {
+          business_id: string
+          label: string
+        }
+        Update: Partial<Database['public']['Tables']['dining_tables']['Row']>
+        Relationships: []
+      }
+      restaurant_orders: {
+        Row: {
+          id: string
+          business_id: string
+          location_id: string
+          table_id: string | null
+          service_mode: ServiceMode
+          state: RestaurantOrderState
+          opened_by: string | null
+          shift_id: string | null
+          guest_count: number | null
+          note: string | null
+          sale_id: string | null
+          opened_at: string
+          closed_at: string | null
+          updated_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['restaurant_orders']['Row']> & {
+          business_id: string
+          location_id: string
+        }
+        Update: Partial<Database['public']['Tables']['restaurant_orders']['Row']>
+        Relationships: []
+      }
+      restaurant_order_items: {
+        Row: {
+          id: string
+          order_id: string
+          business_id: string
+          variant_id: string
+          quantity: string
+          unit_price: string
+          state: RestaurantOrderState
+          note: string | null
+          created_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['restaurant_order_items']['Row']> & {
+          order_id: string
+          business_id: string
+          variant_id: string
+          quantity: string
+          unit_price: string
+        }
+        Update: Partial<Database['public']['Tables']['restaurant_order_items']['Row']>
+        Relationships: []
+      }
+      restaurant_order_item_modifiers: {
+        Row: {
+          id: string
+          order_item_id: string
+          business_id: string
+          label: string
+          price_delta: string
+          created_at: string
+        }
+        Insert: Partial<
+          Database['public']['Tables']['restaurant_order_item_modifiers']['Row']
+        > & {
+          order_item_id: string
+          business_id: string
+          label: string
+        }
+        Update: Partial<Database['public']['Tables']['restaurant_order_item_modifiers']['Row']>
+        Relationships: []
+      }
+      modifier_options: {
+        Row: {
+          id: string
+          business_id: string
+          group_name: string
+          label: string
+          price_delta: string
+          sort_order: number
+          is_active: boolean
+          created_at: string
+        }
+        Insert: Partial<Database['public']['Tables']['modifier_options']['Row']> & {
+          business_id: string
+          group_name: string
+          label: string
+        }
+        Update: Partial<Database['public']['Tables']['modifier_options']['Row']>
         Relationships: []
       }
       activity_events: {

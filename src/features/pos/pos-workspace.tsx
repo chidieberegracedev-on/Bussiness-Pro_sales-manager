@@ -43,6 +43,7 @@ import { RecordExpenseDialog } from '@/features/finance/record-expense-dialog'
 import { TransferCashDialog } from '@/features/finance/transfer-cash-dialog'
 import { useDefaultLocation, useActiveBusiness } from '@/features/business/hooks'
 import { usePosConfig } from '@/features/pos/use-pos-config'
+import { RestaurantFloor } from '@/features/restaurant/restaurant-floor'
 import { useTodaysSales } from '@/features/pos/use-todays-sales'
 import { useLocale } from '@/features/auth/use-locale'
 import { formatDateTime } from '@/lib/format'
@@ -111,7 +112,11 @@ export function PosWorkspace() {
   const operatorName = context?.display_name ?? membership?.display_name ?? 'Operator'
   // Off means gone, not greyed: a till that offers Hold and then refuses is
   // worse than one that never offered it.
-  const holdEnabled = config?.allow_hold_resume ?? true
+  const tablesEnabled = config?.tables_enabled ?? false
+  // A table IS a held order — it is an open ticket somebody comes back to.
+  // Offering held baskets alongside it would give a restaurant two parallel
+  // ways to park the same thing, which is how a ticket goes missing.
+  const holdEnabled = (config?.allow_hold_resume ?? true) && !tablesEnabled
   const heldCount = holdEnabled ? (held ?? []).length : 0
 
   async function clearBasket() {
@@ -323,6 +328,15 @@ export function PosWorkspace() {
           </div>
         )}
 
+        {/* A restaurant does not sell out of a basket, it sells out of a
+            table. `tables_enabled` therefore replaces the selling surface
+            outright rather than adding a panel to it — the same product
+            browser and the same complete_sale underneath. */}
+        {tablesEnabled ? (
+          <div className="h-full min-h-0">
+            <RestaurantFloor showImages={config?.show_product_images ?? true} />
+          </div>
+        ) : (
         <div className="flex h-full min-h-0">
           <div className="flex min-w-0 flex-1 flex-col">
             {scanFeedback && (
@@ -351,9 +365,10 @@ export function PosWorkspace() {
             />
           </div>
         </div>
+        )}
 
         {/* Tablet/phone: the cart is a sheet behind a persistent summary bar. */}
-        {lines.length > 0 && (
+        {!tablesEnabled && lines.length > 0 && (
           <div className="fixed inset-x-0 bottom-0 z-30 bg-surface p-3 shadow-e3 lg:hidden">
             <Button
               className="h-14 w-full justify-between text-base"

@@ -6,6 +6,7 @@ import { useCategories } from '@/features/products/categories-hooks'
 import { CategoryIconGlyph } from '@/features/products/category-icon-picker'
 import { useDebouncedValue } from '@/hooks/use-debounced-value'
 import { useCartStore } from '@/features/pos/cart-store'
+import { useProductSink } from '@/features/pos/product-sink'
 import { variantLabel, type GroupedProduct } from '@/features/products/types'
 import { useSignedImageUrls } from '@/hooks/use-signed-image-url'
 import { PRODUCT_IMAGE_BUCKET } from '@/lib/storage-buckets'
@@ -254,20 +255,17 @@ function ProductRow({
   showImage: boolean
   variantsEnabled: boolean
 }) {
-  const addLine = useCartStore((s) => s.addLine)
-  const setQuantity = useCartStore((s) => s.setQuantity)
-  const lines = useCartStore((s) => s.lines)
+  const sink = useProductSink()
 
   const only = product.variants[0]
-  const singleLine = !product.hasVariants
-    ? lines.find((l) => l.variantId === only?.variant_id)
-    : undefined
+  const rowQty = only && !product.hasVariants ? sink.quantityOf(only.variant_id) : new Decimal(0)
+  const inSink = rowQty.gt(0)
 
   const pill = STOCK_PILL[product.worstStatus]
 
   function addSimple() {
     if (!only) return
-    addLine({
+    sink.add({
       variantId: only.variant_id,
       productName: product.productName,
       variantName: null,
@@ -336,16 +334,16 @@ function ProductRow({
   return (
     <div className="flex w-full items-center gap-3 rounded-2xl bg-surface p-3 shadow-e1">
       {body}
-      {singleLine ? (
+      {inSink && only ? (
         <div className="flex shrink-0 items-center gap-1 rounded-full bg-accent-primary p-1 text-primary-foreground">
           <StepButton
             label={`Remove one ${product.productName}`}
-            onClick={() => setQuantity(singleLine.variantId, singleLine.quantity.minus(1))}
+            onClick={() => sink.setQuantity(only.variant_id, rowQty.minus(1))}
           >
             <Minus className="size-3.5" />
           </StepButton>
           <span className="min-w-6 text-center text-sm font-bold tabular-nums">
-            {singleLine.quantity.toString()}
+            {rowQty.toString()}
           </span>
           <StepButton label={`Add one ${product.productName}`} onClick={addSimple}>
             <Plus className="size-3.5" />
@@ -376,23 +374,22 @@ function ProductTile({
   showImage: boolean
   variantsEnabled: boolean
 }) {
-  const addLine = useCartStore((s) => s.addLine)
-  const setQuantity = useCartStore((s) => s.setQuantity)
-  const lines = useCartStore((s) => s.lines)
+  const sink = useProductSink()
 
-  // A product with one variant has one cart line; a variant product may have
+  // A product with one variant has one line; a variant product may have
   // several, so the tile shows the total across them.
-  const inCart = useMemo(() => {
-    const ids = new Set(product.variants.map((v) => v.variant_id))
-    return lines
-      .filter((l) => ids.has(l.variantId))
-      .reduce((sum, l) => sum.plus(l.quantity), new Decimal(0))
-  }, [lines, product])
+  const inCart = useMemo(
+    () =>
+      product.variants.reduce(
+        (sum, v) => sum.plus(sink.quantityOf(v.variant_id)),
+        new Decimal(0),
+      ),
+    [product, sink],
+  )
 
   const only = product.variants[0]
-  const singleLine = !product.hasVariants
-    ? lines.find((l) => l.variantId === only?.variant_id)
-    : undefined
+  const tileQty = only && !product.hasVariants ? sink.quantityOf(only.variant_id) : new Decimal(0)
+  const stepping = tileQty.gt(0)
 
   const pill = STOCK_PILL[product.worstStatus] ?? {
     label: 'Unknown',
@@ -401,7 +398,7 @@ function ProductTile({
 
   function addSimple() {
     if (!only) return
-    addLine({
+    sink.add({
       variantId: only.variant_id,
       productName: product.productName,
       variantName: null,
@@ -467,20 +464,18 @@ function ProductTile({
             <span className="flex h-10 w-full items-center justify-center rounded-xl bg-background text-sm font-semibold text-text-primary">
               Choose option
             </span>
-          ) : singleLine ? (
+          ) : stepping && only ? (
             <div className="flex h-10 items-center justify-between rounded-xl bg-accent-primary px-1.5 text-primary-foreground">
               <StepButton
                 label={`Remove one ${product.productName}`}
                 onClick={(e) => {
                   e.stopPropagation()
-                  setQuantity(singleLine.variantId, singleLine.quantity.minus(1))
+                  sink.setQuantity(only.variant_id, tileQty.minus(1))
                 }}
               >
                 <Minus className="size-4" />
               </StepButton>
-              <span className="text-sm font-bold tabular-nums">
-                {singleLine.quantity.toString()}
-              </span>
+              <span className="text-sm font-bold tabular-nums">{tileQty.toString()}</span>
               <StepButton
                 label={`Add one ${product.productName}`}
                 onClick={(e) => {
@@ -528,7 +523,7 @@ function ProductTile({
 
   // Already stepping — the whole tile must not also add, or a tap on the minus
   // would decrement and then the bubble would re-add.
-  if (singleLine) return <div className="group h-full w-full">{tile}</div>
+  if (stepping) return <div className="group h-full w-full">{tile}</div>
 
   return (
     <button type="button" onClick={addSimple} className="group h-full w-full text-left">
@@ -559,7 +554,7 @@ function StepButton({
 }
 
 function VariantList({ product }: { product: GroupedProduct }) {
-  const addLine = useCartStore((s) => s.addLine)
+  const sink = useProductSink()
 
   return (
     <div className="space-y-1">
@@ -568,7 +563,7 @@ function VariantList({ product }: { product: GroupedProduct }) {
           key={v.variant_id}
           type="button"
           onClick={() =>
-            addLine({
+            sink.add({
               variantId: v.variant_id,
               productName: product.productName,
               variantName: variantLabel(v),

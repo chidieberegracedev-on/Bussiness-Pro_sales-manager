@@ -38,7 +38,20 @@ function newLine(method: PaymentMethod = 'cash', amount = ''): PaymentLine {
 
 type CompletedSale = Database['public']['Tables']['sales']['Row']
 
-export function PaymentDialog({ open, onOpenChange }: { open: boolean; onOpenChange: (open: boolean) => void }) {
+export function PaymentDialog({
+  open,
+  onOpenChange,
+  onCompleted,
+}: {
+  open: boolean
+  onOpenChange: (open: boolean) => void
+  /**
+   * Fires once the sale is committed. A restaurant order uses this to record
+   * which sale settled it — an order is not revenue, the sale it produced is —
+   * so the payment flow itself stays exactly the same in every vertical.
+   */
+  onCompleted?: (sale: CompletedSale) => void
+}) {
   const queryClient = useQueryClient()
   const { business } = useActiveBusiness()
   const { data: location } = useDefaultLocation()
@@ -146,6 +159,7 @@ export function PaymentDialog({ open, onOpenChange }: { open: boolean; onOpenCha
     queryClient.invalidateQueries({ queryKey: ['financial-position', business.id] })
     queryClient.invalidateQueries({ queryKey: ['cashbook', business.id] })
     setCompletedSale(data)
+    onCompleted?.(data)
   }
 
   function handleNewSale() {

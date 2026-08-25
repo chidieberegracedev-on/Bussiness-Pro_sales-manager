@@ -6,7 +6,7 @@ import { supabase } from '@/lib/supabase'
 import { Button } from '@/components/ui/button'
 import { Money } from '@/components/money/money'
 import { Skeleton } from '@/components/ui/skeleton'
-import { useCartStore } from '@/features/pos/cart-store'
+import { useProductSink } from '@/features/pos/product-sink'
 import { variantLabel, type GroupedProduct, type VariantStockRow } from '@/features/products/types'
 import { cn } from '@/lib/utils'
 
@@ -64,7 +64,7 @@ export function VariantPicker({
   product: GroupedProduct
   onAdded?: () => void
 }) {
-  const addLine = useCartStore((s) => s.addLine)
+  const sink = useProductSink()
   const { data: optionNames, isLoading } = useOptionNames(product.productId)
 
   const axes: Axis[] = useMemo(() => {
@@ -123,7 +123,7 @@ export function VariantPicker({
   }
 
   function add(variant: VariantStockRow) {
-    addLine({
+    sink.add({
       variantId: variant.variant_id,
       productName: product.productName,
       variantName: variantLabel(variant),

@@ -12,11 +12,7 @@ import {
   DialogTitle,
 } from '@/components/ui/dialog'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
-import {
-  useCategories,
-  useCreateCategory,
-  ICONS_UNAVAILABLE_REASON,
-} from '@/features/products/categories-hooks'
+import { useCategories, useCreateCategory } from '@/features/products/categories-hooks'
 import {
   CategoryIconPicker,
   CategoryIconGlyph,
@@ -46,7 +42,7 @@ export function CategoryField({
   onChange: (categoryId: string) => void
   id?: string
 }) {
-  const { data: categories, iconsAvailable } = useCategories()
+  const { data: categories } = useCategories()
   const [creating, setCreating] = useState(false)
 
   const selected = categories?.find((c) => c.id === value)
@@ -87,7 +83,7 @@ export function CategoryField({
             </SelectItem>
           ))}
           <SelectItem value={CREATE_VALUE}>
-            <span className="flex items-center gap-2 font-medium text-accent">
+            <span className="flex items-center gap-2 font-medium text-accent-primary">
               <Plus className="size-4" /> Create category
             </span>
           </SelectItem>
@@ -97,7 +93,6 @@ export function CategoryField({
       <CreateCategoryDialog
         open={creating}
         onOpenChange={setCreating}
-        iconsAvailable={iconsAvailable}
         onCreated={(category) => onChange(category.id)}
       />
     </>
@@ -112,13 +107,11 @@ export function CreateCategoryDialog({
   open,
   onOpenChange,
   onCreated,
-  iconsAvailable,
   initialName = '',
 }: {
   open: boolean
   onOpenChange: (open: boolean) => void
   onCreated: (category: { id: string; name: string; icon: string | null }) => void
-  iconsAvailable: boolean
   initialName?: string
 }) {
   const createCategory = useCreateCategory()
@@ -181,8 +174,6 @@ export function CreateCategoryDialog({
                     iconTouched.current = true
                     setIcon(next)
                   }}
-                  disabled={!iconsAvailable}
-                  disabledReason={undefined}
                 />
                 <Input
                   id="new-category-name"
@@ -192,7 +183,6 @@ export function CreateCategoryDialog({
                   autoFocus
                 />
               </div>
-              {!iconsAvailable && <p className="type-meta">{ICONS_UNAVAILABLE_REASON}</p>}
             </div>
           </div>
 
