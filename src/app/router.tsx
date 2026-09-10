@@ -98,6 +98,24 @@ export function AppRouter() {
           <Route path="/till" element={<RegistryRoute />} />
           <Route path="/me/*" element={<EmployeeWorkspaceRoutes />} />
 
+          {/* Settings is its own workspace with its own shell — outside AppShell
+              so the global management sidebar does not follow you in (brief §11).
+              Its child routes and role guards are unchanged. */}
+          <Route path="/settings" element={<SettingsLayout />}>
+            <Route index element={<SettingsIndexRedirect />} />
+            <Route path="appearance" element={<SettingsAppearancePage />} />
+            <Route element={<RequireRole roles={[...MANAGE_ROLES]} />}>
+              <Route path="business" element={<SettingsBusinessPage />} />
+              <Route path="categories" element={<SettingsCategoriesPage />} />
+              <Route path="employees" element={<Navigate to="/employees" replace />} />
+              <Route path="pos" element={<SettingsPosPage />} />
+              <Route path="floor-plan" element={<SettingsFloorPlanPage />} />
+              <Route path="terminals" element={<SettingsTerminalsPage />} />
+              <Route path="printing" element={<PrintQueuePage />} />
+              <Route path="permissions" element={<SettingsPermissionsPage />} />
+            </Route>
+          </Route>
+
           {/* Everything below is the management workspace. WorkspaceGate sends a
               PIN-unlocked cashier to the Registry instead. */}
           <Route element={<WorkspaceGate />}>
@@ -199,20 +217,6 @@ export function AppRouter() {
             <Route path="/help/dictionary" element={<DictionaryPage />} />
             <Route path="/help/calculator" element={<CalculatorPage />} />
 
-            <Route path="/settings" element={<SettingsLayout />}>
-              <Route index element={<SettingsIndexRedirect />} />
-              <Route path="appearance" element={<SettingsAppearancePage />} />
-              <Route element={<RequireRole roles={[...MANAGE_ROLES]} />}>
-                <Route path="business" element={<SettingsBusinessPage />} />
-                <Route path="categories" element={<SettingsCategoriesPage />} />
-                <Route path="employees" element={<Navigate to="/employees" replace />} />
-                <Route path="pos" element={<SettingsPosPage />} />
-                <Route path="floor-plan" element={<SettingsFloorPlanPage />} />
-              <Route path="terminals" element={<SettingsTerminalsPage />} />
-                <Route path="printing" element={<PrintQueuePage />} />
-                <Route path="permissions" element={<SettingsPermissionsPage />} />
-              </Route>
-            </Route>
           </Route>
           </Route>
         </Route>

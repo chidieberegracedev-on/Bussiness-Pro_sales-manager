@@ -67,90 +67,147 @@ export interface NavSection {
   items: NavItem[]
 }
 
-export const NAV_ITEMS: NavItem[] = [
-  { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard, roles: MANAGEMENT },
-  // Both of these leave the management shell for a role-scoped workspace with
-  // its own navigation — that is the point, not an accident of routing.
-  { label: 'Open the till', to: '/till', icon: ShoppingCart, roles: MANAGEMENT },
-  { label: 'My work', to: '/me', icon: UserRound },
-  { label: 'Sales', to: '/sales', icon: Receipt, roles: MANAGEMENT },
-  { label: 'Products', to: '/products', icon: Package, roles: BACKROOM },
+/** A titled block of top-level destinations in the global sidebar. */
+export interface NavGroup {
+  /** Small-caps domain label. Absent for the pinned top block. */
+  title?: string
+  items: NavItem[]
+}
+
+/**
+ * The global navigation, grouped into DOMAINS rather than a flat wall of links.
+ *
+ * The point is orientation: a user entering the app should see a handful of
+ * areas — "where can I go" — not thirty destinations at once. Each top-level
+ * item still owns its children, but those children are revealed only when their
+ * area is the one you are in (see the sidebar), so the resting state stays
+ * calm. Section titles are quiet; the accent is spent on the selected row, not
+ * on the headers.
+ */
+export const NAV_GROUPS: NavGroup[] = [
   {
-    label: 'Inventory',
-    to: '/inventory/low-stock',
-    icon: AlertTriangle,
-    roles: BACKROOM,
-    children: [
-      { label: 'Low stock', to: '/inventory/low-stock', icon: AlertTriangle },
-      { label: 'Stock movements', to: '/inventory/movements', icon: History, roles: BACKROOM },
-      { label: 'Stock counts', to: '/inventory/counts', icon: ClipboardList, roles: BACKROOM },
+    // Pinned, header-less: the three things anyone starts a session from. Two
+    // of them leave the management shell for a role-scoped workspace — that is
+    // deliberate, not an accident of routing.
+    items: [
+      { label: 'Dashboard', to: '/dashboard', icon: LayoutDashboard, roles: MANAGEMENT },
+      { label: 'Open the till', to: '/till', icon: ShoppingCart, roles: MANAGEMENT },
+      { label: 'My work', to: '/me', icon: UserRound },
     ],
   },
   {
-    label: 'Purchasing',
-    to: '/purchase-orders',
-    icon: ShoppingBag,
-    roles: BACKROOM,
-    children: [
-      { label: 'Purchase Orders', to: '/purchase-orders', icon: FileText },
-      { label: 'Suppliers', to: '/suppliers', icon: Truck },
-      { label: 'Restock', to: '/restock', icon: Repeat, roles: BACKROOM },
-      { label: 'Purchase History', to: '/purchase-history', icon: History },
-    ],
-  },
-  // No `children` here: once you are inside the workspace the SUPPLIER NETWORK
-  // section below takes over, and duplicating the same links as sub-items
-  // would put every destination on screen twice.
-  { label: 'Supplier Network', to: '/network', icon: Globe, roles: MANAGEMENT },
-  {
-    label: 'Finance',
-    to: '/expenses',
-    icon: Wallet,
-    roles: MANAGEMENT,
-    children: [
-      { label: 'Overview', to: '/finance', icon: DollarSign, roles: MANAGEMENT },
-      { label: 'Cashbook', to: '/finance/cashbook', icon: BookOpen, roles: MANAGEMENT },
-      { label: 'Expenses', to: '/expenses', icon: Receipt },
-      { label: 'Shifts', to: '/shifts', icon: Clock },
-    ],
-  },
-  {
-    label: 'Team & Control',
-    to: '/employees',
-    icon: ShieldCheck,
-    roles: MANAGEMENT,
-    children: [
-      { label: 'Employees', to: '/employees', icon: Users },
-      { label: 'Performance', to: '/control/performance', icon: BarChart3 },
-      { label: 'Live shifts', to: '/control/live-shifts', icon: Clock },
-      { label: 'Reconciliation', to: '/control/reconciliation', icon: Scale },
-      { label: 'Exceptions', to: '/control/exceptions', icon: ShieldQuestion },
-      { label: 'Activity log', to: '/control/activity', icon: History },
+    title: 'Operate',
+    items: [
+      { label: 'Sales', to: '/sales', icon: Receipt, roles: MANAGEMENT },
+      {
+        label: 'Inventory',
+        to: '/inventory/low-stock',
+        icon: AlertTriangle,
+        roles: BACKROOM,
+        children: [
+          { label: 'Low stock', to: '/inventory/low-stock', icon: AlertTriangle },
+          { label: 'Stock movements', to: '/inventory/movements', icon: History, roles: BACKROOM },
+          { label: 'Stock counts', to: '/inventory/counts', icon: ClipboardList, roles: BACKROOM },
+        ],
+      },
+      {
+        label: 'Purchasing',
+        to: '/purchase-orders',
+        icon: ShoppingBag,
+        roles: BACKROOM,
+        matchPrefix: '/purchase',
+        children: [
+          { label: 'Purchase Orders', to: '/purchase-orders', icon: FileText },
+          { label: 'Suppliers', to: '/suppliers', icon: Truck },
+          { label: 'Restock', to: '/restock', icon: Repeat, roles: BACKROOM },
+          { label: 'Purchase History', to: '/purchase-history', icon: History },
+        ],
+      },
     ],
   },
   {
-    label: 'Reports',
-    to: '/reports/sales',
-    icon: BarChart3,
-    roles: MANAGEMENT,
-    children: [
-      { label: 'Sales Report', to: '/reports/sales', icon: Receipt },
-      { label: 'Product Performance', to: '/reports/products', icon: TrendingUp },
-      { label: 'Inventory Intelligence', to: '/reports/inventory', icon: Warehouse },
+    title: 'Manage',
+    items: [
+      { label: 'Products', to: '/products', icon: Package, roles: BACKROOM, matchPrefix: '/products' },
+      {
+        label: 'Team & Control',
+        to: '/employees',
+        icon: ShieldCheck,
+        roles: MANAGEMENT,
+        matchPrefix: '/control',
+        children: [
+          { label: 'Employees', to: '/employees', icon: Users },
+          { label: 'Performance', to: '/control/performance', icon: BarChart3 },
+          { label: 'Live shifts', to: '/control/live-shifts', icon: Clock },
+          { label: 'Reconciliation', to: '/control/reconciliation', icon: Scale },
+          { label: 'Exceptions', to: '/control/exceptions', icon: ShieldQuestion },
+          { label: 'Activity log', to: '/control/activity', icon: History },
+        ],
+      },
     ],
   },
   {
-    label: 'Help & Learning',
-    to: '/help/learning',
-    icon: GraduationCap,
-    children: [
-      { label: 'Learning Center', to: '/help/learning', icon: Compass },
-      { label: 'Dictionary', to: '/help/dictionary', icon: BookA },
-      { label: 'Calculator', to: '/help/calculator', icon: Calculator },
+    title: 'Insights',
+    items: [
+      {
+        label: 'Reports',
+        to: '/reports/sales',
+        icon: BarChart3,
+        roles: MANAGEMENT,
+        matchPrefix: '/reports',
+        children: [
+          { label: 'Sales Report', to: '/reports/sales', icon: Receipt },
+          { label: 'Product Performance', to: '/reports/products', icon: TrendingUp },
+          { label: 'Inventory Intelligence', to: '/reports/inventory', icon: Warehouse },
+        ],
+      },
+      {
+        label: 'Finance',
+        to: '/finance',
+        icon: Wallet,
+        roles: MANAGEMENT,
+        matchPrefix: '/finance',
+        children: [
+          { label: 'Overview', to: '/finance', icon: DollarSign, roles: MANAGEMENT },
+          { label: 'Cashbook', to: '/finance/cashbook', icon: BookOpen, roles: MANAGEMENT },
+          { label: 'Expenses', to: '/expenses', icon: Receipt },
+          { label: 'Shifts', to: '/shifts', icon: Clock },
+        ],
+      },
     ],
   },
-  { label: 'Settings', to: '/settings/business', icon: Settings },
+  {
+    title: 'Network',
+    items: [
+      // No children: inside /network the SUPPLIER NETWORK section below takes
+      // over, so listing its destinations here too would double them up.
+      { label: 'Supplier Network', to: '/network', icon: Globe, roles: MANAGEMENT, matchPrefix: '/network' },
+    ],
+  },
+  {
+    title: 'Learn',
+    items: [
+      {
+        label: 'Help & Learning',
+        to: '/help/learning',
+        icon: GraduationCap,
+        matchPrefix: '/help',
+        children: [
+          { label: 'Learning Center', to: '/help/learning', icon: Compass },
+          { label: 'Dictionary', to: '/help/dictionary', icon: BookA },
+          { label: 'Calculator', to: '/help/calculator', icon: Calculator },
+        ],
+      },
+    ],
+  },
+  {
+    title: 'System',
+    items: [{ label: 'Settings', to: '/settings/business', icon: Settings, matchPrefix: '/settings' }],
+  },
 ]
+
+/** Flat list, for anything that needs every destination regardless of group. */
+export const NAV_ITEMS: NavItem[] = NAV_GROUPS.flatMap((g) => g.items)
 
 /**
  * Workspace sections — nav that appears INSIDE the global sidebar when the
