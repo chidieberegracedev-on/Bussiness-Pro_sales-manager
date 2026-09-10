@@ -124,33 +124,30 @@ const LIVE_TOGGLES: ToggleSpec[] = [
     body: 'Track a ticket from sent through cooking, ready and served.',
     relevantTo: ['restaurant'],
   },
-]
-
-const PENDING_TOGGLES: ToggleSpec[] = [
   {
     key: 'allow_line_discount',
     label: 'Line discounts',
-    pending:
-      'complete_sale reads the live price server-side and takes no discount, so a discount typed here would not be charged. Needs a migration.',
-    body: 'Let an operator discount a single line.',
+    body: 'A cashier can take an amount off a single line. The price stays fixed server-side.',
+    relevantTo: ['general', 'boutique', 'grocery'],
   },
   {
     key: 'capture_customer',
     label: 'Attach a customer',
-    pending:
-      'The customers table and sales.customer_id exist, but complete_sale does not accept a customer and sales carries no update policy, so the link could not be written. Waiting on the complete_sale extension.',
-    body: 'Record who a sale was for.',
+    body: 'Record who a sale was for, and build a customer list at the counter.',
     relevantTo: ['boutique', 'general'],
   },
   {
     key: 'returns_enabled',
     label: 'Returns and exchanges',
-    pending:
-      'sales.parent_sale_id and is_return now exist, but complete_sale still refuses a negative quantity, so a return could not reverse stock or refund. Waiting on the complete_sale extension.',
-    body: 'Take a product back against its original sale.',
+    body: 'Take a product back against its original sale — stock and the refund reverse together.',
     relevantTo: ['boutique', 'general', 'grocery'],
   },
 ]
+
+// Everything now has a workflow behind it. The section stays in the code so the
+// discipline it enforced is visible: a flag lands here first, with its specific
+// blocker, and only moves up to LIVE_TOGGLES once the workflow actually reads it.
+const PENDING_TOGGLES: ToggleSpec[] = []
 
 /**
  * How this business's till behaves.
