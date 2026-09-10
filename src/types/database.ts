@@ -1384,6 +1384,12 @@ export interface Database {
           voided_at: string | null
           item_count: string
           unit_count: string
+          // Appended when complete_sale_v2 / its view update landed.
+          discount_total: string
+          is_return: boolean
+          parent_sale_id: string | null
+          customer_id: string | null
+          customer_name: string | null
         }
         Relationships: []
       }
@@ -1667,6 +1673,30 @@ export interface Database {
           p_payments?: unknown
           p_note?: string | null
           p_shift_id?: string | null
+        }
+        Returns: Database['public']['Tables']['sales']['Row']
+      }
+      /**
+       * The companion the architect shipped live (12B/12C). Adds three things
+       * the original could not: a per-item `discount` (price still set
+       * server-side), returns via `p_is_return` + `p_parent_sale_id` (stock and
+       * money reversed, over-return blocked), and attribution via
+       * `p_actor_token` (the PIN session token → the real operator, not the
+       * device login). The old complete_sale stays for callers not yet moved.
+       */
+      complete_sale_v2: {
+        Args: {
+          p_sale_id: string
+          p_business_id: string
+          p_location_id: string
+          p_items: unknown
+          p_payments?: unknown
+          p_note?: string | null
+          p_shift_id?: string | null
+          p_actor_token?: string | null
+          p_is_return?: boolean
+          p_parent_sale_id?: string | null
+          p_customer_id?: string | null
         }
         Returns: Database['public']['Tables']['sales']['Row']
       }

@@ -1,8 +1,19 @@
+import { useState } from 'react'
 import Decimal from 'decimal.js'
-import { Minus, Package, Plus, ShoppingBag, Trash2 } from 'lucide-react'
-import { useCartStore, cartSubtotal } from '@/features/pos/cart-store'
+import { Minus, Package, Plus, ShoppingBag, Tag, Trash2, X } from 'lucide-react'
+import {
+  useCartStore,
+  cartSubtotal,
+  cartDiscountTotal,
+  cartNetTotal,
+  lineDiscount,
+  type CartLine,
+} from '@/features/pos/cart-store'
 import { Button } from '@/components/ui/button'
 import { Money } from '@/components/money/money'
+import { MoneyInput } from '@/components/money/money-input'
+import { CustomerBar } from '@/features/pos/customer-picker'
+import { useActiveBusiness } from '@/features/business/hooks'
 import { useSignedImageUrls } from '@/hooks/use-signed-image-url'
 import { PRODUCT_IMAGE_BUCKET } from '@/lib/storage-buckets'
 import { cn } from '@/lib/utils'
@@ -20,17 +31,25 @@ export function PosCart({
   onRemoveLine,
   onClear,
   chargeDisabled,
+  captureCustomer = false,
+  allowLineDiscount = false,
 }: {
   onCharge: () => void
   /** Supplied where a removal is a gated action, so it can route through the authorization modal. */
   onRemoveLine?: (variantId: string) => void
   onClear?: () => void
   chargeDisabled?: boolean
+  /** capture_customer — show the customer bar above the lines. */
+  captureCustomer?: boolean
+  /** allow_line_discount — offer a per-line discount control. */
+  allowLineDiscount?: boolean
 }) {
   const lines = useCartStore((s) => s.lines)
   const setQuantity = useCartStore((s) => s.setQuantity)
   const removeLine = useCartStore((s) => s.removeLine)
   const subtotal = cartSubtotal(lines)
+  const discountTotal = cartDiscountTotal(lines)
+  const netTotal = cartNetTotal(lines)
   const handleRemove = onRemoveLine ?? removeLine
 
   const { data: imageUrls } = useSignedImageUrls(
@@ -55,6 +74,12 @@ export function PosCart({
         )}
       </div>
 
+      {captureCustomer && lines.length > 0 && (
+        <div className="shrink-0 px-4 pb-2">
+          <CustomerBar />
+        </div>
+      )}
+
       <div className="min-h-0 flex-1 overflow-y-auto px-4">
         {lines.length === 0 ? (
           <div className="flex h-full flex-col items-center justify-center px-6 text-center">
@@ -68,7 +93,9 @@ export function PosCart({
           <ul className="space-y-1.5 pb-2">
             {lines.map((line) => {
               const url = line.imagePath ? imageUrls?.get(line.imagePath) : undefined
-              const lineTotal = line.quantity.times(line.unitPrice)
+              const gross = line.quantity.times(line.unitPrice)
+              const discount = lineDiscount(line)
+              const lineTotal = gross.minus(discount)
 
               return (
                 <li
@@ -111,10 +138,19 @@ export function PosCart({
                         </Stepper>
                       </div>
 
-                      <span className="shrink-0 text-sm font-bold tabular-nums text-text-primary">
+                      <span className="shrink-0 text-right text-sm font-bold tabular-nums text-text-primary">
+                        {discount.gt(0) && (
+                          <span className="mr-1.5 font-medium text-text-muted line-through">
+                            <Money value={gross} />
+                          </span>
+                        )}
                         <Money value={lineTotal} />
                       </span>
                     </div>
+
+                    {allowLineDiscount && (
+                      <LineDiscountControl line={line} gross={gross} discount={discount} />
+                    )}
                   </div>
 
                   <button
@@ -149,12 +185,21 @@ export function PosCart({
             </span>
           </div>
 
+          {discountTotal.gt(0) && (
+            <div className="mt-1.5 flex items-center justify-between text-sm">
+              <span className="text-text-secondary">Discount</span>
+              <span className="font-semibold tabular-nums text-success">
+                −<Money value={discountTotal} />
+              </span>
+            </div>
+          )}
+
           <div className="my-3 border-t border-dashed border-border" />
 
           <div className="flex items-baseline justify-between">
             <span className="text-[0.9375rem] font-semibold text-text-primary">Total</span>
             <span className="text-2xl font-bold tabular-nums text-text-primary">
-              <Money value={subtotal} />
+              <Money value={netTotal} />
             </span>
           </div>
         </div>
@@ -164,7 +209,7 @@ export function PosCart({
           onClick={onCharge}
           disabled={chargeDisabled || lines.length === 0}
         >
-          Charge <Money value={subtotal} />
+          Charge <Money value={netTotal} />
         </Button>
         <p className="type-meta mt-2 text-center">
           <kbd className="rounded bg-background px-1.5 py-0.5 font-mono text-[0.6875rem] font-semibold">
@@ -173,6 +218,108 @@ export function PosCart({
           to charge
         </p>
       </div>
+    </div>
+  )
+}
+
+/**
+ * The per-line discount editor.
+ *
+ * A closed chip until tapped, so the common no-discount case adds no clutter to
+ * a busy cart. The amount is a proposal: it is stored on the line and sent to
+ * complete_sale_v2, which reads the price itself and clamps the discount to the
+ * line — the client can never set a price, only ask for money off one. The
+ * input is bounded to the line's gross here too so the displayed total stays
+ * honest before it reaches the server.
+ */
+function LineDiscountControl({
+  line,
+  gross,
+  discount,
+}: {
+  line: CartLine
+  gross: Decimal
+  discount: Decimal
+}) {
+  const { business } = useActiveBusiness()
+  const setLineDiscount = useCartStore((s) => s.setLineDiscount)
+  const [open, setOpen] = useState(false)
+  const [draft, setDraft] = useState('')
+
+  if (!open && discount.lte(0)) {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          setDraft('')
+          setOpen(true)
+        }}
+        className="mt-1.5 flex items-center gap-1 text-xs font-semibold text-text-muted transition-colors hover:text-accent-primary"
+      >
+        <Tag className="size-3.5" aria-hidden /> Add discount
+      </button>
+    )
+  }
+
+  if (!open) {
+    return (
+      <button
+        type="button"
+        onClick={() => {
+          setDraft(discount.toString())
+          setOpen(true)
+        }}
+        className="mt-1.5 flex items-center gap-1 text-xs font-semibold text-success transition-colors hover:text-accent-primary"
+      >
+        <Tag className="size-3.5" aria-hidden /> −<Money value={discount} /> off · edit
+      </button>
+    )
+  }
+
+  function commit() {
+    const trimmed = draft.trim()
+    if (!trimmed) {
+      setLineDiscount(line.variantId, null)
+      setOpen(false)
+      return
+    }
+    let value = new Decimal(trimmed || '0')
+    if (value.lt(0)) value = new Decimal(0)
+    if (value.gt(gross)) value = gross
+    setLineDiscount(line.variantId, value)
+    setOpen(false)
+  }
+
+  return (
+    <div className="mt-1.5 flex items-center gap-1.5">
+      <MoneyInput
+        value={draft}
+        onChange={(e) => setDraft(e.target.value)}
+        onKeyDown={(e) => {
+          if (e.key === 'Enter') commit()
+          if (e.key === 'Escape') setOpen(false)
+        }}
+        aria-label={`Discount for ${line.productName}, up to ${gross.toString()}`}
+        autoFocus
+        className="h-8 text-sm"
+      />
+      <Button type="button" size="sm" variant="outline" className="h-8 shrink-0" onClick={commit}>
+        Apply
+      </Button>
+      {discount.gt(0) && (
+        <button
+          type="button"
+          onClick={() => {
+            setLineDiscount(line.variantId, null)
+            setOpen(false)
+          }}
+          aria-label="Remove discount"
+          className="shrink-0 rounded-md p-1 text-icon-muted hover:text-danger"
+        >
+          <X className="size-4" />
+        </button>
+      )}
+      {business && <span className="sr-only">Currency {business.currency_code}</span>}
     </div>
   )
 }

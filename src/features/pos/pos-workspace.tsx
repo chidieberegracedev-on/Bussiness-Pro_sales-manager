@@ -10,6 +10,7 @@ import {
   Receipt,
   ScanLine,
   ShoppingCart,
+  RotateCcw,
   UserRound,
   Vault,
 } from 'lucide-react'
@@ -44,6 +45,7 @@ import { TransferCashDialog } from '@/features/finance/transfer-cash-dialog'
 import { useDefaultLocation, useActiveBusiness } from '@/features/business/hooks'
 import { usePosConfig } from '@/features/pos/use-pos-config'
 import { RestaurantFloor } from '@/features/restaurant/restaurant-floor'
+import { ReturnDialog } from '@/features/pos/return-dialog'
 import { useTodaysSales } from '@/features/pos/use-todays-sales'
 import { useLocale } from '@/features/auth/use-locale'
 import { formatDateTime } from '@/lib/format'
@@ -118,6 +120,10 @@ export function PosWorkspace() {
   // ways to park the same thing, which is how a ticket goes missing.
   const holdEnabled = (config?.allow_hold_resume ?? true) && !tablesEnabled
   const heldCount = holdEnabled ? (held ?? []).length : 0
+  // Returns live in the till, gated by the switch. A basket-first till has
+  // them in the nav; a restaurant refunds from its own flow, not here.
+  const returnsEnabled = (config?.returns_enabled ?? false) && !tablesEnabled
+  const [returnOpen, setReturnOpen] = useState(false)
 
   async function clearBasket() {
     if (lines.length === 0) return
@@ -216,6 +222,9 @@ export function PosWorkspace() {
               ]
             : []),
           { label: 'Recent sales', icon: History, onClick: () => setPanel('history') },
+          ...(returnsEnabled
+            ? [{ label: 'Returns', icon: RotateCcw, onClick: () => setReturnOpen(true) }]
+            : []),
         ],
       },
       {
@@ -231,7 +240,7 @@ export function PosWorkspace() {
         ],
       },
     ],
-    [heldCount, holdEnabled, openShift, operatorName],
+    [heldCount, holdEnabled, returnsEnabled, openShift, operatorName],
   )
 
   return (
@@ -362,6 +371,8 @@ export function PosWorkspace() {
               onCharge={() => setPaymentOpen(true)}
               onRemoveLine={voidLine}
               onClear={clearBasket}
+              captureCustomer={config?.capture_customer ?? false}
+              allowLineDiscount={config?.allow_line_discount ?? false}
             />
           </div>
         </div>
@@ -396,6 +407,8 @@ export function PosWorkspace() {
           }}
           onRemoveLine={voidLine}
           onClear={clearBasket}
+          captureCustomer={config?.capture_customer ?? false}
+          allowLineDiscount={config?.allow_line_discount ?? false}
         />
       </WorkspacePanel>
 
@@ -453,6 +466,8 @@ export function PosWorkspace() {
         onLock={() => lock.mutate()}
         onSignOut={() => endSession.mutate()}
       />
+
+      <ReturnDialog open={returnOpen} onOpenChange={setReturnOpen} />
 
       <PaymentDialog open={paymentOpen} onOpenChange={setPaymentOpen} />
       <RecordExpenseDialog open={expenseOpen} onOpenChange={setExpenseOpen} />

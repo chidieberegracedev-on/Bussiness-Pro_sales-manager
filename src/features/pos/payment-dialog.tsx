@@ -5,7 +5,8 @@ import { Loader2, Plus, Trash2 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { toReadableError } from '@/lib/errors'
 import { useActiveBusiness, useDefaultLocation } from '@/features/business/hooks'
-import { useCartStore, cartSubtotal } from '@/features/pos/cart-store'
+import { useCartStore, cartNetTotal, lineDiscount } from '@/features/pos/cart-store'
+import { readToken } from '@/features/control/session-store'
 import { useOpenShift } from '@/features/finance/use-shifts'
 import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
@@ -59,7 +60,11 @@ export function PaymentDialog({
   const lines = useCartStore((s) => s.lines)
   const saleId = useCartStore((s) => s.saleId)
   const resetCart = useCartStore((s) => s.reset)
-  const subtotal = cartSubtotal(lines)
+  // The amount owed is NET of line discounts — the total the cashier and the
+  // customer both see on the cart. The server re-derives it, but the tender
+  // defaults and change calculation here have to match what is on screen.
+  const customer = useCartStore((s) => s.customer)
+  const subtotal = cartNetTotal(lines)
 
   const [payments, setPayments] = useState<PaymentLine[]>([newLine('cash', '')])
   const [note, setNote] = useState('')
@@ -127,7 +132,12 @@ export function PaymentDialog({
       .filter((p) => p.amount.trim() !== '' && Number(p.amount) > 0)
       .map((p) => ({ method: p.method, amount: new Decimal(p.amount).toString() }))
 
-    const { data, error: rpcError } = await supabase.rpc('complete_sale', {
+    // complete_sale_v2: the live companion. p_actor_token is the PIN session
+    // token, so the sale is attributed to the operator, not the device login;
+    // it is null in single-owner mode, where the account holder IS the
+    // operator and the server resolves them from auth.uid(). The per-line
+    // `discount` is a proposal the server clamps — the price stays server-side.
+    const { data, error: rpcError } = await supabase.rpc('complete_sale_v2', {
       p_sale_id: saleId,
       p_business_id: business.id,
       p_location_id: location.id,
@@ -135,16 +145,19 @@ export function PaymentDialog({
         variant_id: l.variantId,
         quantity: l.quantity.toString(),
         movement_id: l.movementId,
+        discount: lineDiscount(l).toString(),
       })),
       p_payments: paymentsPayload,
       p_note: note.trim() || null,
       p_shift_id: openShift?.id ?? null,
+      p_actor_token: readToken(),
+      p_customer_id: customer?.id ?? null,
     })
 
     setSubmitting(false)
 
     if (rpcError || !data) {
-      console.error('[complete_sale] failed', { saleId, error: rpcError })
+      console.error('[complete_sale_v2] failed', { saleId, error: rpcError })
       // Do not clear the cart — a retry must reuse the same saleId so a sale
       // that actually succeeded server-side returns idempotently instead of
       // duplicating (AC-S9.3, BR-S5.5).
